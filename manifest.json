@@ -1,0 +1,8 @@
+{
+  "domain": "nea_sg_weather",
+  "name": "NEA Singapore Weather",
+  "config_flow": true,
+  "codeowners": ["@liangleslie"],
+  "iot_class": "cloud_polling",
+  "version": "1.0.0"
+}
