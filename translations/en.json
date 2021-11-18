@@ -1,0 +1,31 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "NEA Singapore Weather",
+        "description": "Set up weather and weather sensor entities using weather data from NEA's open API.\nChoose to set up just a weather entity, or sensor entities for different areas.",
+        "data": {
+          "name": "Entity name",
+          "weather": "Set up main weather entity?",
+          "sensor": "Set up additional sensor entities?",
+          "scan_interval": "Scan Interval",
+          "timeout": "Timeout"
+        }
+      },
+      "sensor": {
+        "title": "Set up weather sensor entities",
+        "description": "Define a name prefix and choose the areas you want to create weather sensors for.\nChoosing \"All\" will create all 47 sensor entities for all areas tracked by NEA.",
+        "data": {
+          "prefix": "Prefix for sensor entities' names",
+          "areas": "Select areas in Singapore to create sensor entities",
+          "region": "Add regional weather sensor entities?",
+          "rain": "Add rain map sensors entity?"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "Integration with same name already registered, please remove existing configuration and try again",
+      "no_entities_selected": "No entities selected, please choose an entity type to register and try again"
+    }
+  }
+}
