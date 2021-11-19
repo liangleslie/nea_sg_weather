@@ -179,13 +179,15 @@ class NeaWeatherData:
                 if get_params["params"] == "iso time"
                 else {}
             )
-            self.raw_data[key] = await get_url(
+            _response_json = await get_url(
                 self._hass,
                 get_params["url"],
                 url_suffix=_url_suffix,
                 params=_params,
                 headers=get_params["headers"],
             )
+            if _response_json is not None:
+                self.raw_data[key] = _response_json
 
         _LOGGER.debug("Data is: %s", self.raw_data)
         self.data = self.WeatherProperties(
