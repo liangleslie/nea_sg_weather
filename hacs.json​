@@ -2,5 +2,5 @@
   "name": "NEA Singapore Weather Integration",
   "content_in_root": true,
   "domains": ["weather", "sensor", "camera"],
-  "country": ["SG"]
+  "country": "SG"
 }
