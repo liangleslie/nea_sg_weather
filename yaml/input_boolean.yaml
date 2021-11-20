@@ -1,0 +1,11 @@
+# create toggles for rain map overlays by including this in your cofiguration.yaml:
+# input_boolean: !include custom_components/nea_sg_weather/yaml/input_boolean.yaml
+
+singapore_weather_rain_map:
+  name: Toggle rain map overlays
+
+singapore_weather_town_icons:
+  name: Toggle town weather icons
+
+singapore_weather_region_icons:
+  name: Toggle regional weather icons

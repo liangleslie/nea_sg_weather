@@ -1,0 +1,321 @@
+# create rain map lovelace card by including this in your lovelace.yaml:
+# !include custom_component/nea_sg_weather/yaml/lovelace.yaml
+# or copy and paste this as a manual card in the lovelace editor
+
+  type: vertical-stack
+  cards:
+    - type: picture-elements
+      image: 'https://www.nea.gov.sg/assets/images/map/base-853.png'
+      elements:
+          - type: conditional
+            conditions:
+              - entity: input_boolean.singapore_weather_rain_map
+                state: "on"
+            elements:
+            - type: image
+              camera_image: camera.singapore_weather_rain_map
+              style:
+                position: absolute
+                width: 100%
+                height: 100%
+                transform: translate(0,-100%)
+                opacity: .4
+              tap_action: none
+              hold_action: none
+            - type: state-label
+              entity: camera.singapore_weather_rain_map
+              attribute: Updated at
+              style:
+                position: absolute
+                width: 100%
+                height: 100%
+                transform: translate(0%,-15%)
+                color: black
+              tap_action: none
+              hold_action: none
+          - type: conditional
+            conditions:
+              - entity: input_boolean.singapore_weather_town_icons
+                state: "on"
+            elements:
+            - entity: sensor.singapore_weather_ang_mo_kio
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"47.5%", "top":"26.5%"}
+            - entity: sensor.singapore_weather_bedok
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"61.62%", "top":"43%"}
+            - entity: sensor.singapore_weather_bishan
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"47%", "top":"34%"}
+            - entity: sensor.singapore_weather_boon_lay
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"23%", "top":"49%"}
+            - entity: sensor.singapore_weather_bukit_batok
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"32.7%", "top":"33.7%"}
+            - entity: sensor.singapore_weather_bukit_merah
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"43.8%", "top":"57.8%"}
+            - entity: sensor.singapore_weather_bukit_panjang
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"36%", "top":"29.5%"}
+            - entity: sensor.singapore_weather_bukit_timah
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"38.5%", "top":"41.8%"}
+            - entity: sensor.singapore_weather_central_water_catchment
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"40.5%", "top":"25%"}
+            - entity: sensor.singapore_weather_changi
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"75%", "top":"36%"}
+            - entity: sensor.singapore_weather_choa_chu_kang
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"31.43%", "top":"25%"}
+            - entity: sensor.singapore_weather_clementi
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"34%", "top":"47%"}
+            - entity: sensor.singapore_weather_city
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"49%", "top":"54%"}
+            - entity: sensor.singapore_weather_geylang
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"56%", "top":"45%"}
+            - entity: sensor.singapore_weather_hougang
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"55.5%", "top":"31.5%"}
+            - entity: sensor.singapore_weather_jalan_bahar
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"18%", "top":"35.3%"}
+            - entity: sensor.singapore_weather_jurong_east
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"29.5%", "top":"44%"}
+            - entity: sensor.singapore_weather_jurong_island
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"19%", "top":"61.5%"}
+            - entity: sensor.singapore_weather_jurong_west
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"24.24%", "top":"38%"}
+            - entity: sensor.singapore_weather_kallang
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"51.8%", "top":"48%"}
+            - entity: sensor.singapore_weather_lim_chu_kang
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"26%", "top":"11%"}
+            - entity: sensor.singapore_weather_mandai
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"42.5%", "top":"13%"}
+            - entity: sensor.singapore_weather_marine_parade
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"57%", "top":"53.5%"}
+            - entity: sensor.singapore_weather_novena
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"45.5%", "top":"42%"}
+            - entity: sensor.singapore_weather_pasir_ris
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"65.81%", "top":"25.8%"}
+            - entity: sensor.singapore_weather_paya_lebar
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"60.38%", "top":"33.5%"}
+            - entity: sensor.singapore_weather_pioneer
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"18%", "top":"47.5%"}
+            - entity: sensor.singapore_weather_pulau_tekong
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"85%", "top":"18%"}
+            - entity: sensor.singapore_weather_pulau_ubin
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"68%", "top":"17%"}
+            - entity: sensor.singapore_weather_punggol
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"59.7%", "top":"17.5%"}
+            - entity: sensor.singapore_weather_queenstown
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"38.3%", "top":"53.5%"}
+            - entity: sensor.singapore_weather_seletar
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"54%", "top":"15.5%"}
+            - entity: sensor.singapore_weather_sembawang
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"43.5%", "top":"2.8%"}
+            - entity: sensor.singapore_weather_sengkang
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"56.5%", "top":"23%"}
+            - entity: sensor.singapore_weather_sentosa
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"45.5%", "top":"65.81%"}
+            - entity: sensor.singapore_weather_serangoon
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"51.5%", "top":"32%"}
+            - entity: sensor.singapore_weather_southern_islands
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"48.2%", "top":"76.06%"}
+            - entity: sensor.singapore_weather_sungei_kadut
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"33%", "top":"14.5%"}
+            - entity: sensor.singapore_weather_tampines
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"66%", "top":"36%"}
+            - entity: sensor.singapore_weather_tanglin
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"43%", "top":"49%"}
+            - entity: sensor.singapore_weather_tengah
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"26.16%", "top":"26.5%"}
+            - entity: sensor.singapore_weather_toa_payoh
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"50.44%", "top":"40%"}
+            - entity: sensor.singapore_weather_tuas
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"11.8%", "top":"54%"}
+            - entity: sensor.singapore_weather_western_islands
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"30.87%", "top":"78.62%"}
+            - entity: sensor.singapore_weather_western_water_catchment
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"20.5%", "top":"18.51%"}
+            - entity: sensor.singapore_weather_woodlands
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"38%", "top":"8%"}
+            - entity: sensor.singapore_weather_yishun
+              type: state-icon
+              style:
+                <<: {"transform": "scale(0.5,0.5)", "transform-origin": "top left"}
+                <<: {"left":"48%", "top":"11.39%"}
+
+          - type: conditional
+            conditions:
+              - entity: input_boolean.singapore_weather_region_icons
+                state: "on"
+            elements:
+            - type: state-icon
+              entity: sensor.singapore_weather_north
+              style:
+                left: 40%
+                top: 5%
+                transform: none
+            - type: state-icon
+              entity: sensor.singapore_weather_south
+              style:
+                bottom: 30%
+                left: 40%
+                transform: none
+            - type: state-icon
+              entity: sensor.singapore_weather_east
+              style:
+                right: 20%
+                top: 30%
+                transform: none
+            - type: state-icon
+              entity: sensor.singapore_weather_west
+              style:
+                left: 15%
+                top: 30%
+                transform: none
+            - type: state-icon
+              entity: sensor.singapore_weather_central
+              style:
+                left: 40%
+                top: 30%
+                transform: none
+    - type: entities
+      entities:
+        - type: buttons
+          entities:
+            - entity: input_boolean.singapore_weather_rain_map
+              name: Rain
+            - entity: input_boolean.singapore_weather_town_icons
+              name: Towns
+            - entity: input_boolean.singapore_weather_region_icons
+              name: Regions
