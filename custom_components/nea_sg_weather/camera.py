@@ -5,7 +5,8 @@ import asyncio
 import logging
 from types import MappingProxyType
 from typing import Any
-
+from datetime import datetime, timezone, timedelta
+import math
 import httpx
 
 from homeassistant.components.camera import Camera
@@ -18,7 +19,12 @@ from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.update_coordinator import T
 
 from . import NeaWeatherDataUpdateCoordinator
-from .const import DOMAIN, RAIN_MAP_HEADERS
+from .const import (
+    DOMAIN,
+    RAIN_MAP_HEADERS,
+    RAIN_MAP_URL_PREFIX,
+    RAIN_MAP_URL_SUFFIX,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,13 +56,12 @@ class NeaRainCamera(Camera):
         self.hass = hass
         self.coordinator = coordinator
         self._name = config.get(CONF_NAME) + " Rain Map"
-        self._still_image_url = coordinator.data.rain_map_url
-        # self._still_image_url.hass = hass
         self._limit_refetch = True
         self._supported_features = 0
         self.content_type = "image/png"
         self.verify_ssl = True
-        self._last_url = None
+        self._last_query_time = None
+        self._last_image_time = None
         self._last_image = None
         self._platform = "camera"
         self._prefix = config[CONF_SENSORS][CONF_PREFIX]
@@ -96,48 +101,77 @@ class NeaRainCamera(Camera):
         self, width: int | None = None, height: int | None = None
     ) -> bytes | None:
         """Return a still image response from the camera."""
-        url = self.coordinator.data.rain_map_url
-        if url == self._last_url and self._limit_refetch:
+        _current_query_time = int(
+            datetime.strftime(datetime.now(timezone(timedelta(hours=8))), "%Y%m%d%H%M")
+        )
+        _current_image_time = math.floor(_current_query_time / 5) * 5
+
+        if _current_image_time == self._last_image_time and self._limit_refetch:
             return self._last_image
 
-        try:
-            async_client = get_async_client(self.hass, verify_ssl=self.verify_ssl)
-            response = await async_client.get(url, headers=RAIN_MAP_HEADERS)
-            response.raise_for_status()
-            self._last_image = response.content
+        async def get_image(current_image_time: int) -> bytes | None:
+            url = RAIN_MAP_URL_PREFIX + str(current_image_time) + RAIN_MAP_URL_SUFFIX
+            _LOGGER.debug("Getting rain map image from %s", url)
+            try:
+                async_client = get_async_client(self.hass, verify_ssl=self.verify_ssl)
+                response = await async_client.get(url, headers=RAIN_MAP_HEADERS)
+                if response.status_code == 200:
+                    self._last_image = response.content
+                    self._last_image_time = current_image_time
+                    # Update timestamp from external coordinator entity
+                    self._last_state = self.hass.states.get(self.entity_id).state
+                    self._last_attributes = self.hass.states.get(
+                        self.entity_id
+                    ).attributes
+                    self._updated_attributes = dict(self._last_attributes)
+                    self._updated_attributes["Updated at"] = datetime.strptime(
+                        str(current_image_time), "%Y%m%d%H%M"
+                    ).isoformat()
+                    self._updated_attributes["URL"] = url
+                    self.hass.states.async_set(
+                        self.entity_id, self._last_state, self._updated_attributes
+                    )
+                    _LOGGER.debug(
+                        "Rain map image successfully updated at %s, new URL is %s",
+                        datetime.strptime(
+                            str(current_image_time), "%Y%m%d%H%M"
+                        ).isoformat(),
+                        url,
+                    )
+                    return self._last_image
 
-            # Update timestamp from external coordinator entity
-            self._last_state = self.hass.states.get(self.entity_id).state
-            self._last_attributes = self.hass.states.get(self.entity_id).attributes
-            self._updated_attributes = dict(self._last_attributes)
-            self._updated_attributes[
-                "Updated at"
-            ] = self.coordinator.data.rain_map_timestamp
-            self._updated_attributes["URL"] = self.coordinator.data.rain_map_url
-            self.hass.states.async_set(
-                self.entity_id, self._last_state, self._updated_attributes
-            )
-            _LOGGER.debug(
-                "Updated at %s, new URL is %s",
-                self.coordinator.data.rain_map_timestamp,
-                self.coordinator.data.rain_map_url,
-            )
+                elif response.status_code == 404:
+                    # Image not ready, check older image urls
+                    _LOGGER.debug(
+                        "%s rain map image not ready, trying previous images",
+                        current_image_time,
+                    )
+                    if current_image_time - 5 == self._last_image_time:
+                        return self._last_image
+                    else:
+                        return await get_image(current_image_time - 5)
 
-            self._last_url = url
-            return self._last_image
-        except httpx.TimeoutException:
-            _LOGGER.warning(
-                "Timeout getting camera image for %s from %s", self._name, url
-            )
-            return self._last_image
-        except (httpx.RequestError, httpx.HTTPStatusError) as err:
-            _LOGGER.warning(
-                "Error getting new camera image for %s from %s: %s",
-                self._name,
-                url,
-                err,
-            )
-            return self._last_image
+                else:
+                    response.raise_for_status()
+
+            except httpx.TimeoutException:
+                _LOGGER.warning(
+                    "Timeout getting camera image for %s from %s", self._name, url
+                )
+                return self._last_image
+
+            except (httpx.RequestError, httpx.HTTPStatusError) as err:
+                _LOGGER.warning(
+                    "Error getting new camera image for %s from %s: %s",
+                    self._name,
+                    url,
+                    err,
+                )
+                return self._last_image
+
+        if _current_query_time != self._last_query_time:
+            self._last_query_time = _current_query_time
+            return await get_image(_current_image_time)
 
     async def stream_source(self):
         """Return the source of the stream."""
@@ -147,8 +181,8 @@ class NeaRainCamera(Camera):
     def extra_state_attributes(self) -> dict:
         """Return dict of additional properties to attach to sensors."""
         return {
-            "Updated at": self.coordinator.data.rain_map_timestamp,
-            "URL": self.coordinator.data.rain_map_url,
+            "Updated at": None,
+            "URL": None,
         }
 
     @property

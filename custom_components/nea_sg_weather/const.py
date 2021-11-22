@@ -30,9 +30,12 @@ HEADERS = {
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36",
 }
 RAIN_MAP_HEADERS = {
+    "authority": "www.weather.gov.sg",
     "referer": "https://www.nea.gov.sg/weather/rain-areas",
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36",
 }
+RAIN_MAP_URL_PREFIX = "https://www.weather.gov.sg/files/rainarea/50km/v2/dpsri_70km_"
+RAIN_MAP_URL_SUFFIX = "0000dBR.dpsri.png"
 
 FORECAST_ICON_BASE_URL = "https://www.nea.gov.sg/assets/images/icons/weather-bg/"
 
@@ -176,43 +179,23 @@ AREAS = [
 REGIONS = ["West", "East", "Central", "South", "North"]
 
 WEATHER_ENDPOINTS = {
-    key: {"url": url, "url_suffix": "", "params": "iso time", "headers": HEADERS}
-    for key, url in {
-        "forecast2hr": "https://api.data.gov.sg/v1/environment/2-hour-weather-forecast",
-        "temperature": "https://api.data.gov.sg/v1/environment/air-temperature",
-        "humidity": "https://api.data.gov.sg/v1/environment/relative-humidity",
-        "wind-direction": "https://api.data.gov.sg/v1/environment/wind-direction",
-        "wind-speed": "https://api.data.gov.sg/v1/environment/wind-speed",
-        "forecast4day": "https://api.data.gov.sg/v1/environment/4-day-weather-forecast",
-    }.items()
+    "forecast2hr": "https://api.data.gov.sg/v1/environment/2-hour-weather-forecast",
+    "temperature": "https://api.data.gov.sg/v1/environment/air-temperature",
+    "humidity": "https://api.data.gov.sg/v1/environment/relative-humidity",
+    "wind-direction": "https://api.data.gov.sg/v1/environment/wind-direction",
+    "wind-speed": "https://api.data.gov.sg/v1/environment/wind-speed",
+    "forecast4day": "https://api.data.gov.sg/v1/environment/4-day-weather-forecast",
 }
 
 AREAS_ENDPOINTS = {
-    "forecast2hr": {
-        "url": "https://api.data.gov.sg/v1/environment/2-hour-weather-forecast",
-        "url_suffix": "",
-        "params": "iso time",
-        "headers": HEADERS,
-    }
+    "forecast2hr": "https://api.data.gov.sg/v1/environment/2-hour-weather-forecast"
 }
 
 REGION_ENDPOINTS = {
-    "forecast24hr": {
-        "url": "https://api.data.gov.sg/v1/environment/24-hour-weather-forecast",
-        "url_suffix": "",
-        "params": "iso time",
-        "headers": HEADERS,
-    }
+    "forecast24hr": "https://api.data.gov.sg/v1/environment/24-hour-weather-forecast"
 }
 
-RAIN_ENDPOINTS = {
-    "rain_map": {
-        "url": "https://www.nea.gov.sg/api/RainArea/GetRecentData/",
-        "url_suffix": "unix time",
-        "params": "",
-        "headers": RAIN_MAP_HEADERS,
-    }
-}
+RAIN_ENDPOINTS = {}
 
 ENDPOINTS = {
     CONF_WEATHER: WEATHER_ENDPOINTS,

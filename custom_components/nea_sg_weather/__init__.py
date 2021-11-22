@@ -39,6 +39,7 @@ from .const import (
     DOMAIN,
     ENDPOINTS,
     FORECAST_MAP_CONDITION,
+    HEADERS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -67,23 +68,21 @@ def get_platforms(config_entry: ConfigEntry) -> dict:
 
 
 async def get_url(
-    hass: HomeAssistant, url: str, url_suffix="", params=None, headers=None
+    hass: HomeAssistant, url: str, params: dict = None, headers: dict = None
 ) -> ClientResponse:
     """Function to make GET requests"""
     try:
-        _LOGGER.debug("Fetching data from %s, with params=%s", url + url_suffix, params)
+        _LOGGER.debug("Fetching data from %s, with params=%s", url, params)
         async_client = get_async_client(hass, verify_ssl=True)
-        response = await async_client.get(
-            url + url_suffix, params=params, headers=headers
-        )
+        response = await async_client.get(url, params=params, headers=headers)
         response.raise_for_status()
         return response.json()
     except httpx.TimeoutException:
-        _LOGGER.error("Timeout making GET request from %s", url + url_suffix)
+        _LOGGER.error("Timeout making GET request from %s", url)
     except (httpx.RequestError, httpx.HTTPStatusError) as err:
         _LOGGER.error(
             "Error getting data from %s: %s",
-            url + url_suffix,
+            url,
             err,
         )
 
@@ -165,26 +164,16 @@ class NeaWeatherData:
             .isoformat()
         )
         for option in get_platforms(self._config_entry)["entities"]:
-            for key, get_params in ENDPOINTS[option].items():
-                _endpoints[key] = get_params
+            for key, url in ENDPOINTS[option].items():
+                _endpoints[key] = url
 
-        for key, get_params in _endpoints.items():
-            _url_suffix = (
-                str(math.floor(datetime.timestamp(datetime.now()) / 300) * 300)
-                if get_params["url_suffix"] == "unix time"
-                else ""
-            )
-            _params = (
-                {get_params["params"]: self.raw_data["date_time"]}
-                if get_params["params"] == "iso time"
-                else {}
-            )
+        for key, url in _endpoints.items():
+            _params = {"date_time": self.raw_data["date_time"]}
             _response_json = await get_url(
                 self._hass,
-                get_params["url"],
-                url_suffix=_url_suffix,
+                url,
                 params=_params,
-                headers=get_params["headers"],
+                headers=HEADERS,
             )
             if _response_json is not None:
                 self.raw_data[key] = _response_json
@@ -215,8 +204,6 @@ class NeaWeatherData:
                 self.update_areas("areas")
             if self.raw_data_keys.issuperset(ENDPOINTS[CONF_REGION].keys()):
                 self.update_region("region")
-            if self.raw_data_keys.issuperset(ENDPOINTS[CONF_RAIN].keys()):
-                self.update_rain("rain")
 
         def update_weather(self, entity):
             """Update properties for weather entity"""
@@ -318,16 +305,6 @@ class NeaWeatherData:
                         self.region_forecast[region] += [
                             [_day + _time_of_day, _condition]
                         ]
-            except KeyError as error:
-                self.exception_handler(entity, error)
-
-        def update_rain(self, entity):
-            """Update properties for rain map camera entity"""
-            try:
-                self.rain_map_timestamp = self.raw_data["rain_map"][-1]["SortingTime"]
-                self.rain_map_url = (
-                    "https://www.nea.gov.sg" + self.raw_data["rain_map"][-1]["Url"]
-                )
             except KeyError as error:
                 self.exception_handler(entity, error)
 
