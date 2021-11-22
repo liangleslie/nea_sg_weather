@@ -63,6 +63,7 @@ class NeaRainCamera(Camera):
         self._last_query_time = None
         self._last_image_time = None
         self._last_image = None
+        self._last_url = None
         self._platform = "camera"
         self._prefix = config[CONF_SENSORS][CONF_PREFIX]
         self.entity_id = (
@@ -111,6 +112,7 @@ class NeaRainCamera(Camera):
                 if response.status_code == 200:
                     self._last_image = response.content
                     self._last_image_time = current_image_time
+                    self._last_url = url
                     # Update timestamp from external coordinator entity
                     self._last_state = self.hass.states.get(self.entity_id).state
                     self._last_attributes = self.hass.states.get(
@@ -183,8 +185,8 @@ class NeaRainCamera(Camera):
     def extra_state_attributes(self) -> dict:
         """Return dict of additional properties to attach to sensors."""
         return {
-            "Updated at": None,
-            "URL": None,
+            "Updated at": self._last_image_time,
+            "URL": self._last_url,
         }
 
     @property
