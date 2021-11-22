@@ -101,13 +101,6 @@ class NeaRainCamera(Camera):
         self, width: int | None = None, height: int | None = None
     ) -> bytes | None:
         """Return a still image response from the camera."""
-        _current_query_time = int(
-            datetime.strftime(datetime.now(timezone(timedelta(hours=8))), "%Y%m%d%H%M")
-        )
-        _current_image_time = math.floor(_current_query_time / 5) * 5
-
-        if _current_image_time == self._last_image_time and self._limit_refetch:
-            return self._last_image
 
         async def get_image(current_image_time: int) -> bytes | None:
             url = RAIN_MAP_URL_PREFIX + str(current_image_time) + RAIN_MAP_URL_SUFFIX
@@ -153,6 +146,7 @@ class NeaRainCamera(Camera):
 
                 else:
                     response.raise_for_status()
+                    return self._last_image
 
             except httpx.TimeoutException:
                 _LOGGER.warning(
@@ -169,9 +163,17 @@ class NeaRainCamera(Camera):
                 )
                 return self._last_image
 
+        _current_query_time = int(
+            datetime.strftime(datetime.now(timezone(timedelta(hours=8))), "%Y%m%d%H%M")
+        )
+
         if _current_query_time != self._last_query_time:
             self._last_query_time = _current_query_time
-            return await get_image(_current_image_time)
+            _current_image_time = math.floor(_current_query_time / 5) * 5
+            if _current_image_time != self._last_image_time:
+                return await get_image(_current_image_time)
+
+        return self._last_image
 
     async def stream_source(self):
         """Return the source of the stream."""
