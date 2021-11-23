@@ -110,36 +110,39 @@ class NeaRainCamera(Camera):
             try:
                 async_client = get_async_client(self.hass, verify_ssl=self.verify_ssl)
                 response = await async_client.get(url, headers=RAIN_MAP_HEADERS)
-                if response.status_code == 200:
-                    self._last_image = response.content
-                    self._last_image_time = current_image_time
-                    self._last_image_time_pretty = datetime.strptime(
+                response.raise_for_status()
+                self._last_image = response.content
+                self._last_image_time = current_image_time
+                self._last_image_time_pretty = datetime.strptime(
+                    str(current_image_time), "%Y%m%d%H%M"
+                ).isoformat()
+                self._last_url = url
+                # Update timestamp from external coordinator entity
+                self._last_state = self.hass.states.get(self.entity_id).state
+                self._last_attributes = self.hass.states.get(self.entity_id).attributes
+                self._updated_attributes = dict(self._last_attributes)
+                self._updated_attributes["Updated at"] = self._last_image_time_pretty
+                self._updated_attributes["URL"] = url
+                self.hass.states.async_set(
+                    self.entity_id, self._last_state, self._updated_attributes
+                )
+                _LOGGER.debug(
+                    "Rain map image successfully updated at %s, new URL is %s",
+                    datetime.strptime(
                         str(current_image_time), "%Y%m%d%H%M"
-                    ).isoformat()
-                    self._last_url = url
-                    # Update timestamp from external coordinator entity
-                    self._last_state = self.hass.states.get(self.entity_id).state
-                    self._last_attributes = self.hass.states.get(
-                        self.entity_id
-                    ).attributes
-                    self._updated_attributes = dict(self._last_attributes)
-                    self._updated_attributes[
-                        "Updated at"
-                    ] = self._last_image_time_pretty
-                    self._updated_attributes["URL"] = url
-                    self.hass.states.async_set(
-                        self.entity_id, self._last_state, self._updated_attributes
-                    )
-                    _LOGGER.debug(
-                        "Rain map image successfully updated at %s, new URL is %s",
-                        datetime.strptime(
-                            str(current_image_time), "%Y%m%d%H%M"
-                        ).isoformat(),
-                        url,
-                    )
-                    return self._last_image
+                    ).isoformat(),
+                    url,
+                )
+                return self._last_image
 
-                elif response.status_code == 404:
+            except httpx.TimeoutException:
+                _LOGGER.warning(
+                    "Timeout getting camera image for %s from %s", self._name, url
+                )
+                return self._last_image
+
+            except (httpx.HTTPStatusError, httpx.RequestError) as err:
+                if response.status_code == 404:
                     # Image not ready, check older image urls
                     _LOGGER.debug(
                         "%s rain map image not ready, trying previous images",
@@ -149,25 +152,14 @@ class NeaRainCamera(Camera):
                         return self._last_image
                     else:
                         return await get_image(current_image_time - 5)
-
                 else:
-                    response.raise_for_status()
+                    _LOGGER.warning(
+                        "Error getting new camera image for %s from %s: %s",
+                        self._name,
+                        url,
+                        err,
+                    )
                     return self._last_image
-
-            except httpx.TimeoutException:
-                _LOGGER.warning(
-                    "Timeout getting camera image for %s from %s", self._name, url
-                )
-                return self._last_image
-
-            except (httpx.RequestError, httpx.HTTPStatusError) as err:
-                _LOGGER.warning(
-                    "Error getting new camera image for %s from %s: %s",
-                    self._name,
-                    url,
-                    err,
-                )
-                return self._last_image
 
         _current_query_time = int(
             datetime.strftime(datetime.now(timezone(timedelta(hours=8))), "%Y%m%d%H%M")
