@@ -124,6 +124,7 @@ FORECAST_MAP_CONDITION = {
     "hazy": ATTR_CONDITION_FOG,
     "cloudy": ATTR_CONDITION_CLOUDY,
     "overcast": ATTR_CONDITION_CLOUDY,
+    "windy": ATTR_CONDITION_WINDY,
 }
 
 AREAS = [
