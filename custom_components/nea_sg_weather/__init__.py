@@ -245,7 +245,7 @@ class NeaWeatherData:
                 self.forecast = list()
                 for entry in self.raw_data["forecast4day"]["items"][0]["forecasts"]:
                     for forecast_condition, condition in FORECAST_MAP_CONDITION.items():
-                        if forecast_condition in entry["forecast"]:
+                        if forecast_condition in entry["forecast"].lower():
                             self.forecast.append(
                                 {
                                     ATTR_FORECAST_TIME: entry["timestamp"],
