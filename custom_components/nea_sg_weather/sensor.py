@@ -104,7 +104,6 @@ class NeaAreaSensor(CoordinatorEntity, SensorEntity):
         """Device info."""
         return DeviceInfo(
             default_name="Weather forecast coordinator",
-            entry_type="service",
             identifiers={(DOMAIN,)},  # type: ignore[arg-type]
             manufacturer="NEA Weather",
             model="data.gov.sg API Polling",
@@ -173,7 +172,6 @@ class NeaRegionSensor(CoordinatorEntity, SensorEntity):
         """Device info."""
         return DeviceInfo(
             default_name="Weather forecast coordinator",
-            entry_type="service",
             identifiers={(DOMAIN,)},  # type: ignore[arg-type]
             manufacturer="NEA Weather",
             model="data.gov.sg API Polling",
