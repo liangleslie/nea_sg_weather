@@ -358,29 +358,45 @@ class NeaWeatherData:
         def update_region(self, entity):
             """Update properties for region sensor entities"""
             try:
-                self.region_forecast_timestamp = self.raw_data["forecast24hr"]["items"][
-                    0
-                ]["timestamp"]
+                # TEMP FIX FOR BROKEN DATA.GOV API RESULTS
+                _tmp_forecast_datetime = datetime.strptime(
+                    self.raw_data["forecast2hr"]["Channel24HrForecast"]["Main"]["ForecastIssue"]['DateTimeStr'] + " 2022", 
+                    "%I.%M%p %d %b %Y"
+                    ).replace(tzinfo=timezone(timedelta(hours=8)))
+                self.region_forecast_timestamp = _tmp_forecast_datetime.isoformat()
+                
+                _tmp_regions = ["east","west","north","south","central"]
                 self.region_forecast = dict()
-                for region in self.raw_data["forecast24hr"]["items"][0]["periods"][0][
-                    "regions"
-                ].keys():
-                    self.region_forecast[region] = list()
-                    for period in self.raw_data["forecast24hr"]["items"][0]["periods"]:
-                        _time = datetime.fromisoformat(period["time"]["start"])
-                        _now = datetime.now(timezone(timedelta(hours=8)))
-                        _day = "Today " if _time.date() == _now.date() else "Tomorrow "
-                        _time_of_day = (
-                            "morning"
-                            if _time.hour == 6
-                            else "afternoon"
-                            if _time.hour == 12
-                            else "evening"
-                        )
-                        _condition = period["regions"][region]
-                        self.region_forecast[region] += [
-                            [_day + _time_of_day, _condition]
-                        ]
+                
+                for region in _tmp_regions:
+                    self.region_forecast[region] = [self.raw_data["forecast2hr"]["Channel24HrForecast"]["Forecasts"][0]["TimePeriod"],
+                    INV_FORECAST_ICON_MAP_CONDITION[self.raw_data["forecast2hr"]["Channel24HrForecast"]["Forecasts"][0]["Wx"+region]]
+                    ]
+                # END TEMP FIX FOR BROKEN DATA.GOV API RESULTS
+                
+                # self.region_forecast_timestamp = self.raw_data["forecast24hr"]["items"][
+                #     0
+                # ]["timestamp"]
+                # self.region_forecast = dict()
+                # for region in self.raw_data["forecast24hr"]["items"][0]["periods"][0][
+                #     "regions"
+                # ].keys():
+                #     self.region_forecast[region] = list()
+                #     for period in self.raw_data["forecast24hr"]["items"][0]["periods"]:
+                #         _time = datetime.fromisoformat(period["time"]["start"])
+                #         _now = datetime.now(timezone(timedelta(hours=8)))
+                #         _day = "Today " if _time.date() == _now.date() else "Tomorrow "
+                #         _time_of_day = (
+                #             "morning"
+                #             if _time.hour == 6
+                #             else "afternoon"
+                #             if _time.hour == 12
+                #             else "evening"
+                #         )
+                #         _condition = period["regions"][region]
+                #         self.region_forecast[region] += [
+                #             [_day + _time_of_day, _condition]
+                #         ]
             except KeyError as error:
                 self.exception_handler(entity, error)
 
