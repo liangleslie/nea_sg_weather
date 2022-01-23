@@ -369,9 +369,9 @@ class NeaWeatherData:
                 self.region_forecast = dict()
                 
                 for region in _tmp_regions:
-                    self.region_forecast[region] = [self.raw_data["forecast2hr"]["Channel24HrForecast"]["Forecasts"][0]["TimePeriod"],
+                    self.region_forecast[region] = [[self.raw_data["forecast2hr"]["Channel24HrForecast"]["Forecasts"][0]["TimePeriod"],
                     INV_FORECAST_ICON_MAP_CONDITION[self.raw_data["forecast2hr"]["Channel24HrForecast"]["Forecasts"][0]["Wx"+region]]
-                    ]
+                    ]]
                 # END TEMP FIX FOR BROKEN DATA.GOV API RESULTS
                 
                 # self.region_forecast_timestamp = self.raw_data["forecast24hr"]["items"][
