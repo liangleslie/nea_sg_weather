@@ -11,7 +11,7 @@ from homeassistant.const import CONF_PREFIX, CONF_REGION, CONF_SENSORS
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity, T
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import NeaWeatherDataUpdateCoordinator
 from .const import (
@@ -58,7 +58,7 @@ class NeaAreaSensor(CoordinatorEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator: NeaWeatherDataUpdateCoordinator[T],
+        coordinator,
         config: MappingProxyType[str, Any],
         area: str,
     ) -> None:
@@ -115,7 +115,7 @@ class NeaRegionSensor(CoordinatorEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator: NeaWeatherDataUpdateCoordinator[T],
+        coordinator,
         config: MappingProxyType[str, Any],
         region: str,
     ) -> None:

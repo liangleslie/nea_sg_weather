@@ -38,6 +38,7 @@ from .const import (
     DEFAULT_TIMEOUT,
     DOMAIN,
     ENDPOINTS,
+    SECONDARY_ENDPOINTS,
     FORECAST_MAP_CONDITION,
     FORECAST_ICON_MAP_CONDITION,
     HEADERS,
@@ -47,8 +48,10 @@ _LOGGER = logging.getLogger(__name__)
 
 ### TEMP FIX FOR BROKEN DATA.GOV API RESULTS
 INV_FORECAST_ICON_MAP_CONDITION = dict()
-for k,v in zip(FORECAST_ICON_MAP_CONDITION.values(),FORECAST_ICON_MAP_CONDITION.keys()):
-    INV_FORECAST_ICON_MAP_CONDITION[k] = v 
+for k, v in zip(
+    FORECAST_ICON_MAP_CONDITION.values(), FORECAST_ICON_MAP_CONDITION.keys()
+):
+    INV_FORECAST_ICON_MAP_CONDITION[k] = v
 ### END TEMP FIX FOR BROKEN DATA.GOV API RESULTS
 
 
@@ -165,6 +168,7 @@ class NeaWeatherData:
     async def async_update(self) -> WeatherProperties:
         """Get the latest data from NEA API for entities registered."""
         _endpoints = dict()
+        _secondary_endpoints = dict()
         self.raw_data["date_time"] = (
             datetime.now(timezone(timedelta(hours=8)))
             .replace(microsecond=0)
@@ -173,6 +177,7 @@ class NeaWeatherData:
         for option in get_platforms(self._config_entry)["entities"]:
             for key, url in ENDPOINTS[option].items():
                 _endpoints[key] = url
+                _secondary_endpoints[key] = SECONDARY_ENDPOINTS[option][key]
 
         for key, url in _endpoints.items():
             _params = {"date_time": self.raw_data["date_time"]}
@@ -187,22 +192,24 @@ class NeaWeatherData:
 
         ### TEMP FIX FOR BROKEN DATA.GOV API RESULTS
         _4_day_response_json = await get_url(
-                self._hass,
-                "https://www.nea.gov.sg/api/Weather4DayOutlook/GetData/" + str(round(datetime.utcnow().timestamp())),
-                headers=HEADERS,
-            )
+            self._hass,
+            "https://www.nea.gov.sg/api/Weather4DayOutlook/GetData/"
+            + str(round(datetime.utcnow().timestamp())),
+            headers=HEADERS,
+        )
         if _4_day_response_json is not None:
             self.raw_data["forecast4day"] = _4_day_response_json
 
         _2_hr_response_json = await get_url(
-                self._hass,
-                "https://www.nea.gov.sg/api/WeatherForecast/forecast24hrnowcast2hrs/" + str(round(datetime.utcnow().timestamp())),
-                headers=HEADERS,
-            )
+            self._hass,
+            "https://www.nea.gov.sg/api/WeatherForecast/forecast24hrnowcast2hrs/"
+            + str(round(datetime.utcnow().timestamp())),
+            headers=HEADERS,
+        )
         if _2_hr_response_json is not None:
             self.raw_data["forecast2hr"] = _2_hr_response_json
         ### END TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-                
+
         _LOGGER.debug("Data is: %s", self.raw_data)
         self.data = self.WeatherProperties(
             self._hass, self.raw_data, self._config_entry
@@ -256,21 +263,23 @@ class NeaWeatherData:
                 self.wind_dir_avg = self.wind_status_dict["agg_wind_direction"]
 
                 # Get most common weather condition across Singapore areas
-#                 self._current_condition_list = [
-#                     item["forecast"]
-#                     for item in self.raw_data["forecast2hr"]["items"][0]["forecasts"]
-#                 ]
-#                 self.current_condition = max(
-#                     set(self._current_condition_list),
-#                     key=self._current_condition_list.count,
-#                 )
+                #                 self._current_condition_list = [
+                #                     item["forecast"]
+                #                     for item in self.raw_data["forecast2hr"]["items"][0]["forecasts"]
+                #                 ]
+                #                 self.current_condition = max(
+                #                     set(self._current_condition_list),
+                #                     key=self._current_condition_list.count,
+                #                 )
 
                 ### TEMP FIX FOR BROKEN DATA.GOV API RESULTS
                 # Get most common weather condition across Singapore areas
 
                 self._current_condition_list = [
                     INV_FORECAST_ICON_MAP_CONDITION[item["Forecast"]]
-                    for item in self.raw_data["forecast2hr"]["Channel2HrForecast"]["Item"]["WeatherForecast"]["Area"]
+                    for item in self.raw_data["forecast2hr"]["Channel2HrForecast"][
+                        "Item"
+                    ]["WeatherForecast"]["Area"]
                 ]
                 self.current_condition = max(
                     set(self._current_condition_list),
@@ -280,43 +289,55 @@ class NeaWeatherData:
 
                 # Build forecast dict object
                 self.forecast = list()
-                
-#                 for entry in self.raw_data["forecast4day"]["items"][0]["forecasts"]:
-#                     for forecast_condition, condition in FORECAST_MAP_CONDITION.items():
-#                         if forecast_condition in entry["forecast"].lower():
-#                             self.forecast.append(
-#                                 {
-#                                     ATTR_FORECAST_TIME: entry["timestamp"],
-#                                     ATTR_FORECAST_TEMP: entry["temperature"]["high"],
-#                                     ATTR_FORECAST_TEMP_LOW: entry["temperature"]["low"],
-#                                     ATTR_FORECAST_WIND_SPEED: entry["wind"]["speed"][
-#                                         "high"
-#                                     ],
-#                                     ATTR_FORECAST_WIND_BEARING: entry["wind"][
-#                                         "direction"
-#                                     ],
-#                                     ATTR_FORECAST_CONDITION: condition,
-#                                 }
-#                             )
-#                             break
+
+                #                 for entry in self.raw_data["forecast4day"]["items"][0]["forecasts"]:
+                #                     for forecast_condition, condition in FORECAST_MAP_CONDITION.items():
+                #                         if forecast_condition in entry["forecast"].lower():
+                #                             self.forecast.append(
+                #                                 {
+                #                                     ATTR_FORECAST_TIME: entry["timestamp"],
+                #                                     ATTR_FORECAST_TEMP: entry["temperature"]["high"],
+                #                                     ATTR_FORECAST_TEMP_LOW: entry["temperature"]["low"],
+                #                                     ATTR_FORECAST_WIND_SPEED: entry["wind"]["speed"][
+                #                                         "high"
+                #                                     ],
+                #                                     ATTR_FORECAST_WIND_BEARING: entry["wind"][
+                #                                         "direction"
+                #                                     ],
+                #                                     ATTR_FORECAST_CONDITION: condition,
+                #                                 }
+                #                             )
+                #                             break
 
                 ### TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-                _today = datetime.now(timezone(timedelta(hours=8))).replace(microsecond=0)
+                _today = datetime.now(timezone(timedelta(hours=8))).replace(
+                    microsecond=0
+                )
                 _date_map = dict()
                 for i in range(5):
                     _date = _today + timedelta(days=i)
-                    _date_map[_date.strftime("%a").upper()] = _date.replace(microsecond=0).isoformat()
-                
+                    _date_map[_date.strftime("%a").upper()] = _date.replace(
+                        microsecond=0
+                    ).isoformat()
+
                 for entry in self.raw_data["forecast4day"]:
                     for forecast_condition, condition in FORECAST_MAP_CONDITION.items():
                         if forecast_condition in entry["forecast"].lower():
                             self.forecast.append(
                                 {
                                     ATTR_FORECAST_TIME: _date_map[entry["day"]],
-                                    ATTR_FORECAST_TEMP: float(entry["temperature"][-4:-2]),
-                                    ATTR_FORECAST_TEMP_LOW: float(entry["temperature"][:2]),
-                                    ATTR_FORECAST_WIND_SPEED: int(entry["wind_speed"][-6:-4]),
-                                    ATTR_FORECAST_WIND_BEARING: entry["wind_speed"].split(" ")[0],
+                                    ATTR_FORECAST_TEMP: float(
+                                        entry["temperature"][-4:-2]
+                                    ),
+                                    ATTR_FORECAST_TEMP_LOW: float(
+                                        entry["temperature"][:2]
+                                    ),
+                                    ATTR_FORECAST_WIND_SPEED: int(
+                                        entry["wind_speed"][-6:-4]
+                                    ),
+                                    ATTR_FORECAST_WIND_BEARING: entry[
+                                        "wind_speed"
+                                    ].split(" ")[0],
                                     ATTR_FORECAST_CONDITION: condition,
                                 }
                             )
@@ -329,26 +350,33 @@ class NeaWeatherData:
         def update_areas(self, entity):
             """Update properties for area sensor entities"""
             try:
-#                 self.area_forecast_timestamp = self.raw_data["forecast2hr"]["items"][0][
-#                     "timestamp"
-#                 ]
-#                 self.area_forecast = {
-#                     forecast["area"]: forecast["forecast"]
-#                     for forecast in self.raw_data["forecast2hr"]["items"][0][
-#                         "forecasts"
-#                     ]
-#                 }
+                #                 self.area_forecast_timestamp = self.raw_data["forecast2hr"]["items"][0][
+                #                     "timestamp"
+                #                 ]
+                #                 self.area_forecast = {
+                #                     forecast["area"]: forecast["forecast"]
+                #                     for forecast in self.raw_data["forecast2hr"]["items"][0][
+                #                         "forecasts"
+                #                     ]
+                #                 }
 
                 # TEMP FIX FOR BROKEN DATA.GOV API RESULTS
                 _tmp_forecast_datetime = datetime.strptime(
-                    self.raw_data["forecast2hr"]["Channel2HrForecast"]["Item"]["ForecastIssue"]['DateTimeStr'] + " 2022", 
-                    "%I.%M%p %d %b %Y"
-                    ).replace(tzinfo=timezone(timedelta(hours=8)))
+                    self.raw_data["forecast2hr"]["Channel2HrForecast"]["Item"][
+                        "ForecastIssue"
+                    ]["DateTimeStr"]
+                    + " 2022",
+                    "%I.%M%p %d %b %Y",
+                ).replace(tzinfo=timezone(timedelta(hours=8)))
                 self.area_forecast_timestamp = _tmp_forecast_datetime.isoformat()
-                
+
                 self.area_forecast = {
-                    forecast["Name"]: INV_FORECAST_ICON_MAP_CONDITION[forecast["Forecast"]]
-                    for forecast in self.raw_data["forecast2hr"]["Channel2HrForecast"]["Item"]["WeatherForecast"]["Area"]
+                    forecast["Name"]: INV_FORECAST_ICON_MAP_CONDITION[
+                        forecast["Forecast"]
+                    ]
+                    for forecast in self.raw_data["forecast2hr"]["Channel2HrForecast"][
+                        "Item"
+                    ]["WeatherForecast"]["Area"]
                 }
                 # END TEMP FIX FOR BROKEN DATA.GOV API RESULTS
 
@@ -360,20 +388,32 @@ class NeaWeatherData:
             try:
                 # TEMP FIX FOR BROKEN DATA.GOV API RESULTS
                 _tmp_forecast_datetime = datetime.strptime(
-                    self.raw_data["forecast2hr"]["Channel24HrForecast"]["Main"]["ForecastIssue"]['DateTimeStr'] + " 2022", 
-                    "%I.%M%p %d %b %Y"
-                    ).replace(tzinfo=timezone(timedelta(hours=8)))
+                    self.raw_data["forecast2hr"]["Channel24HrForecast"]["Main"][
+                        "ForecastIssue"
+                    ]["DateTimeStr"]
+                    + " 2022",
+                    "%I.%M%p %d %b %Y",
+                ).replace(tzinfo=timezone(timedelta(hours=8)))
                 self.region_forecast_timestamp = _tmp_forecast_datetime.isoformat()
-                
-                _tmp_regions = ["east","west","north","south","central"]
+
+                _tmp_regions = ["east", "west", "north", "south", "central"]
                 self.region_forecast = dict()
-                
+
                 for region in _tmp_regions:
-                    self.region_forecast[region] = [[self.raw_data["forecast2hr"]["Channel24HrForecast"]["Forecasts"][0]["TimePeriod"],
-                    INV_FORECAST_ICON_MAP_CONDITION[self.raw_data["forecast2hr"]["Channel24HrForecast"]["Forecasts"][0]["Wx"+region]]
-                    ]]
+                    self.region_forecast[region] = [
+                        [
+                            self.raw_data["forecast2hr"]["Channel24HrForecast"][
+                                "Forecasts"
+                            ][0]["TimePeriod"],
+                            INV_FORECAST_ICON_MAP_CONDITION[
+                                self.raw_data["forecast2hr"]["Channel24HrForecast"][
+                                    "Forecasts"
+                                ][0]["Wx" + region]
+                            ],
+                        ]
+                    ]
                 # END TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-                
+
                 # self.region_forecast_timestamp = self.raw_data["forecast24hr"]["items"][
                 #     0
                 # ]["timestamp"]

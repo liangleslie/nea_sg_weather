@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
-from homeassistant.helpers.update_coordinator import CoordinatorEntity, T
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import NeaWeatherDataUpdateCoordinator
 from .const import ATTRIBUTION, DOMAIN, MAP_CONDITION
@@ -57,7 +57,7 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
 
     def __init__(
         self,
-        coordinator: NeaWeatherDataUpdateCoordinator[T],
+        coordinator,
         config: MappingProxyType[str, Any],
     ) -> None:
         """Initialise the platform with a data instance and site."""
