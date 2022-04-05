@@ -3,30 +3,25 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import logging
-import math
-from types import MappingProxyType
-from typing import Any
 
-import aiohttp
 from aiohttp.client_reqrep import ClientResponse
 from async_timeout import timeout
 import httpx
 from requests.exceptions import ConnectionError as ConnectError, HTTPError, Timeout
 
-from homeassistant.components.camera import _get_camera_from_entity_id
-from homeassistant.components.weather import (
-    ATTR_FORECAST_CONDITION,
-    ATTR_FORECAST_TEMP,
-    ATTR_FORECAST_TEMP_LOW,
-    ATTR_FORECAST_TIME,
-    ATTR_FORECAST_WIND_BEARING,
-    ATTR_FORECAST_WIND_SPEED,
-)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL, CONF_SENSORS, CONF_TIMEOUT
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+
+from .nea import (
+    Forecast2hr,
+    Forecast24hr,
+    Forecast4day,
+    Temperature,
+    Humidity,
+    Wind,
+)
 
 from .const import (
     CONF_AREAS,
@@ -37,22 +32,9 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_TIMEOUT,
     DOMAIN,
-    ENDPOINTS,
-    SECONDARY_ENDPOINTS,
-    FORECAST_MAP_CONDITION,
-    FORECAST_ICON_MAP_CONDITION,
-    HEADERS,
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-### TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-INV_FORECAST_ICON_MAP_CONDITION = dict()
-for k, v in zip(
-    FORECAST_ICON_MAP_CONDITION.values(), FORECAST_ICON_MAP_CONDITION.keys()
-):
-    INV_FORECAST_ICON_MAP_CONDITION[k] = v
-### END TEMP FIX FOR BROKEN DATA.GOV API RESULTS
 
 
 def get_platforms(config_entry: ConfigEntry) -> dict:
@@ -75,26 +57,6 @@ def get_platforms(config_entry: ConfigEntry) -> dict:
     _platforms["platforms"] = list(_platforms["platforms"])
 
     return _platforms
-
-
-async def get_url(
-    hass: HomeAssistant, url: str, params: dict = None, headers: dict = None
-) -> ClientResponse:
-    """Function to make GET requests"""
-    try:
-        _LOGGER.debug("Fetching data from %s, with params=%s", url, params)
-        async_client = get_async_client(hass, verify_ssl=True)
-        response = await async_client.get(url, params=params, headers=headers)
-        response.raise_for_status()
-        return response.json()
-    except httpx.TimeoutException:
-        _LOGGER.error("Timeout making GET request from %s", url)
-    except (httpx.RequestError, httpx.HTTPStatusError) as err:
-        _LOGGER.error(
-            "Error getting data from %s: %s",
-            url,
-            err,
-        )
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
@@ -129,13 +91,13 @@ class NeaWeatherDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialize global Nea Weather data updater."""
         self.timeout = config_entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
-        self.weather = NeaWeatherData(hass, self.timeout, config_entry)
+        self.weather = NeaWeatherData(hass, config_entry)
         self.update_interval = timedelta(
             minutes=config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         )
         self._hass = hass
         self._config_entry = config_entry
-        self.data: NeaWeatherData.WeatherProperties
+        self.data: NeaWeatherData.NeaData
 
         super().__init__(
             hass,
@@ -144,7 +106,7 @@ class NeaWeatherDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=self.update_interval,
         )
 
-    async def _async_update_data(self) -> NeaWeatherData.WeatherProperties:
+    async def _async_update_data(self) -> NeaWeatherData.NeaData:
         """Fetch data from NEA."""
         try:
             async with timeout(self.timeout):
@@ -156,346 +118,48 @@ class NeaWeatherDataUpdateCoordinator(DataUpdateCoordinator):
 class NeaWeatherData:
     """Get the latest data from NEA API."""
 
-    def __init__(self, hass, timeout_seconds, config_entry):
+    def __init__(self, hass, config_entry):
         """Initialize the data object."""
         self._hass = hass
-        self._method = "GET"
-        self._timeout = timeout_seconds
         self._config_entry = config_entry
-        self.raw_data = dict()
-        self.data: self.WeatherProperties
+        self.data = self.NeaData()
 
-    async def async_update(self) -> WeatherProperties:
+    async def async_update(self) -> NeaData:
         """Get the latest data from NEA API for entities registered."""
-        _endpoints = dict()
-        _secondary_endpoints = dict()
-        self.raw_data["date_time"] = (
-            datetime.now(timezone(timedelta(hours=8)))
-            .replace(microsecond=0)
-            .isoformat()
-        )
-        for option in get_platforms(self._config_entry)["entities"]:
-            for key, url in ENDPOINTS[option].items():
-                _endpoints[key] = url
-                _secondary_endpoints[key] = SECONDARY_ENDPOINTS[option][key]
+        # Consolidate data requests to avoid redundant requests
+        _data_objects = list()
+        _response = dict()
+        if self._config_entry.data[CONF_WEATHER]:
+            _data_objects += [
+                self.data.forecast2hr,
+                self.data.forecast24hr,
+                self.data.forecast4day,
+                self.data.temperature,
+                self.data.humidity,
+                self.data.wind,
+            ]
+        if self._config_entry.data[CONF_SENSORS].get(CONF_AREAS, ["None"]) != ["None"]:
+            _data_objects += [self.data.forecast2hr]
+        if self._config_entry.data[CONF_SENSORS].get(CONF_REGION, False):
+            _data_objects += [self.data.forecast24hr]
+        _data_objects = set(_data_objects)
 
-        for key, url in _endpoints.items():
-            _params = {"date_time": self.raw_data["date_time"]}
-            _response_json = await get_url(
-                self._hass,
-                url,
-                params=_params,
-                headers=HEADERS,
-            )
-            if _response_json is not None:
-                self.raw_data[key] = _response_json
+        for data_object in _data_objects:
+            await data_object.async_init()
+            _response[data_object.__class__.__name__] = data_object.response
 
-        ### TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-        _4_day_response_json = await get_url(
-            self._hass,
-            "https://www.nea.gov.sg/api/Weather4DayOutlook/GetData/"
-            + str(round(datetime.utcnow().timestamp())),
-            headers=HEADERS,
-        )
-        if _4_day_response_json is not None:
-            self.raw_data["forecast4day"] = _4_day_response_json
-
-        _2_hr_response_json = await get_url(
-            self._hass,
-            "https://www.nea.gov.sg/api/WeatherForecast/forecast24hrnowcast2hrs/"
-            + str(round(datetime.utcnow().timestamp())),
-            headers=HEADERS,
-        )
-        if _2_hr_response_json is not None:
-            self.raw_data["forecast2hr"] = _2_hr_response_json
-        ### END TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-
-        _LOGGER.debug("Data is: %s", self.raw_data)
-        self.data = self.WeatherProperties(
-            self._hass, self.raw_data, self._config_entry
-        )
+        _LOGGER.debug("Data is: %s", _response)
         _LOGGER.debug("Coordinator was updated at %s", self.data.query_time)
         return self.data
 
-    class WeatherProperties:
-        """Class for extracting weather properties from JSON data"""
+    class NeaData:
+        """Container for Weather data"""
 
-        def __init__(
-            self, hass: HomeAssistant, raw_data: dict, config_entry: ConfigEntry
-        ) -> None:
-            """Initialize properties class"""
-            self._hass = hass
-            self._config_entry = config_entry
-            self.query_time = raw_data["date_time"]
-            self.raw_data = raw_data
-            self.raw_data_keys = set(self.raw_data.keys())
-
-            self.update_weather(CONF_WEATHER)
-            if self.raw_data_keys.issuperset(ENDPOINTS[CONF_AREAS].keys()):
-                self.update_areas("areas")
-            if self.raw_data_keys.issuperset(ENDPOINTS[CONF_REGION].keys()):
-                self.update_region("region")
-
-        def update_weather(self, entity):
-            """Update properties for weather entity"""
-            try:
-                self.temp_timestamp = self.raw_data["temperature"]["items"][0][
-                    "timestamp"
-                ]
-                self.temp_avg = self.list_mean(
-                    self.raw_data["temperature"]["items"][0]["readings"]
-                )
-                self.humd_timestamp = self.raw_data["humidity"]["items"][0]["timestamp"]
-                self.humd_avg = self.list_mean(
-                    self.raw_data["humidity"]["items"][0]["readings"]
-                )
-                self.wind_speed_timestamp = self.raw_data["wind-speed"]["items"][0][
-                    "timestamp"
-                ]
-                self.wind_dir_timestamp = self.raw_data["wind-direction"]["items"][0][
-                    "timestamp"
-                ]
-                self.wind_status_dict = self.wind_status(
-                    self.raw_data["wind-speed"]["items"][0]["readings"],
-                    self.raw_data["wind-direction"]["items"][0]["readings"],
-                )
-                self.wind_speed_avg = self.wind_status_dict["agg_wind_speed"]
-                self.wind_dir_avg = self.wind_status_dict["agg_wind_direction"]
-
-                # Get most common weather condition across Singapore areas
-                #                 self._current_condition_list = [
-                #                     item["forecast"]
-                #                     for item in self.raw_data["forecast2hr"]["items"][0]["forecasts"]
-                #                 ]
-                #                 self.current_condition = max(
-                #                     set(self._current_condition_list),
-                #                     key=self._current_condition_list.count,
-                #                 )
-
-                ### TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-                # Get most common weather condition across Singapore areas
-
-                self._current_condition_list = [
-                    INV_FORECAST_ICON_MAP_CONDITION[item["Forecast"]]
-                    for item in self.raw_data["forecast2hr"]["Channel2HrForecast"][
-                        "Item"
-                    ]["WeatherForecast"]["Area"]
-                ]
-                self.current_condition = max(
-                    set(self._current_condition_list),
-                    key=self._current_condition_list.count,
-                )
-                ### END TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-
-                # Build forecast dict object
-                self.forecast = list()
-
-                #                 for entry in self.raw_data["forecast4day"]["items"][0]["forecasts"]:
-                #                     for forecast_condition, condition in FORECAST_MAP_CONDITION.items():
-                #                         if forecast_condition in entry["forecast"].lower():
-                #                             self.forecast.append(
-                #                                 {
-                #                                     ATTR_FORECAST_TIME: entry["timestamp"],
-                #                                     ATTR_FORECAST_TEMP: entry["temperature"]["high"],
-                #                                     ATTR_FORECAST_TEMP_LOW: entry["temperature"]["low"],
-                #                                     ATTR_FORECAST_WIND_SPEED: entry["wind"]["speed"][
-                #                                         "high"
-                #                                     ],
-                #                                     ATTR_FORECAST_WIND_BEARING: entry["wind"][
-                #                                         "direction"
-                #                                     ],
-                #                                     ATTR_FORECAST_CONDITION: condition,
-                #                                 }
-                #                             )
-                #                             break
-
-                ### TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-                _today = datetime.now(timezone(timedelta(hours=8))).replace(
-                    microsecond=0
-                )
-                _date_map = dict()
-                for i in range(5):
-                    _date = _today + timedelta(days=i)
-                    _date_map[_date.strftime("%a").upper()] = _date.replace(
-                        microsecond=0
-                    ).isoformat()
-
-                for entry in self.raw_data["forecast4day"]:
-                    for forecast_condition, condition in FORECAST_MAP_CONDITION.items():
-                        if forecast_condition in entry["forecast"].lower():
-                            self.forecast.append(
-                                {
-                                    ATTR_FORECAST_TIME: _date_map[entry["day"]],
-                                    ATTR_FORECAST_TEMP: float(
-                                        entry["temperature"][-4:-2]
-                                    ),
-                                    ATTR_FORECAST_TEMP_LOW: float(
-                                        entry["temperature"][:2]
-                                    ),
-                                    ATTR_FORECAST_WIND_SPEED: int(
-                                        entry["wind_speed"][-6:-4]
-                                    ),
-                                    ATTR_FORECAST_WIND_BEARING: entry[
-                                        "wind_speed"
-                                    ].split(" ")[0],
-                                    ATTR_FORECAST_CONDITION: condition,
-                                }
-                            )
-                            break
-                ### END TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-
-            except KeyError as error:
-                self.exception_handler(entity, error)
-
-        def update_areas(self, entity):
-            """Update properties for area sensor entities"""
-            try:
-                #                 self.area_forecast_timestamp = self.raw_data["forecast2hr"]["items"][0][
-                #                     "timestamp"
-                #                 ]
-                #                 self.area_forecast = {
-                #                     forecast["area"]: forecast["forecast"]
-                #                     for forecast in self.raw_data["forecast2hr"]["items"][0][
-                #                         "forecasts"
-                #                     ]
-                #                 }
-
-                # TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-                _tmp_forecast_datetime = datetime.strptime(
-                    self.raw_data["forecast2hr"]["Channel2HrForecast"]["Item"][
-                        "ForecastIssue"
-                    ]["DateTimeStr"]
-                    + " 2022",
-                    "%I.%M%p %d %b %Y",
-                ).replace(tzinfo=timezone(timedelta(hours=8)))
-                self.area_forecast_timestamp = _tmp_forecast_datetime.isoformat()
-
-                self.area_forecast = {
-                    forecast["Name"]: INV_FORECAST_ICON_MAP_CONDITION[
-                        forecast["Forecast"]
-                    ]
-                    for forecast in self.raw_data["forecast2hr"]["Channel2HrForecast"][
-                        "Item"
-                    ]["WeatherForecast"]["Area"]
-                }
-                # END TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-
-            except KeyError as error:
-                self.exception_handler(entity, error)
-
-        def update_region(self, entity):
-            """Update properties for region sensor entities"""
-            try:
-                # TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-                _tmp_forecast_datetime = datetime.strptime(
-                    self.raw_data["forecast2hr"]["Channel24HrForecast"]["Main"][
-                        "ForecastIssue"
-                    ]["DateTimeStr"]
-                    + " 2022",
-                    "%I.%M%p %d %b %Y",
-                ).replace(tzinfo=timezone(timedelta(hours=8)))
-                self.region_forecast_timestamp = _tmp_forecast_datetime.isoformat()
-
-                _tmp_regions = ["east", "west", "north", "south", "central"]
-                self.region_forecast = dict()
-
-                for region in _tmp_regions:
-                    self.region_forecast[region] = [
-                        [
-                            self.raw_data["forecast2hr"]["Channel24HrForecast"][
-                                "Forecasts"
-                            ][0]["TimePeriod"],
-                            INV_FORECAST_ICON_MAP_CONDITION[
-                                self.raw_data["forecast2hr"]["Channel24HrForecast"][
-                                    "Forecasts"
-                                ][0]["Wx" + region]
-                            ],
-                        ]
-                    ]
-                # END TEMP FIX FOR BROKEN DATA.GOV API RESULTS
-
-                # self.region_forecast_timestamp = self.raw_data["forecast24hr"]["items"][
-                #     0
-                # ]["timestamp"]
-                # self.region_forecast = dict()
-                # for region in self.raw_data["forecast24hr"]["items"][0]["periods"][0][
-                #     "regions"
-                # ].keys():
-                #     self.region_forecast[region] = list()
-                #     for period in self.raw_data["forecast24hr"]["items"][0]["periods"]:
-                #         _time = datetime.fromisoformat(period["time"]["start"])
-                #         _now = datetime.now(timezone(timedelta(hours=8)))
-                #         _day = "Today " if _time.date() == _now.date() else "Tomorrow "
-                #         _time_of_day = (
-                #             "morning"
-                #             if _time.hour == 6
-                #             else "afternoon"
-                #             if _time.hour == 12
-                #             else "evening"
-                #         )
-                #         _condition = period["regions"][region]
-                #         self.region_forecast[region] += [
-                #             [_day + _time_of_day, _condition]
-                #         ]
-            except KeyError as error:
-                self.exception_handler(entity, error)
-
-        def exception_handler(self, entity, error):
-            """Function to handle KeyError exceptions when processing response JSON"""
-            _LOGGER.warning(
-                "Unable to parse %s data from coordinator, this could be temporary",
-                entity,
-            )
-            _LOGGER.debug(
-                "%s: Unexpected dict key %s, %s.\nRaw data is: %s",
-                entity,
-                error,
-                type(error),
-                self.raw_data[error],
-            )
-
-        def list_mean(self, values):
-            """Function to calculate mean from list"""
-            sum_values = 0
-            i = 0
-            for value in values:
-                if value["value"] > 0:
-                    sum_values += value["value"]
-                    i += 1
-            return round(sum_values / i, 2)
-
-        def wind_status(self, wind_speed, wind_direction) -> MappingProxyType[str, Any]:
-            """Function to aggregate wind readings into a single aggregated value"""
-            result = {
-                "ns_sum": 0,
-                "ns_avg": 0,
-                "ew_sum": 0,
-                "ew_avg": 0,
-                "readings_used": 0,
-                "agg_wind_speed": 0,
-                "agg_wind_direction": 0,
-            }
-            for wind_speed_reading in wind_speed:
-                for wind_direction_reading in wind_direction:
-                    if (
-                        wind_speed_reading["station_id"]
-                        == wind_direction_reading["station_id"]
-                    ):
-                        result["ns_sum"] += wind_speed_reading["value"] * math.cos(
-                            math.radians(wind_direction_reading["value"] + 180)
-                        )
-                        result["ew_sum"] += wind_speed_reading["value"] * math.sin(
-                            math.radians(wind_direction_reading["value"] + 180)
-                        )
-                        result["readings_used"] += 1
-            result["ns_avg"] = result["ns_sum"] / result["readings_used"]
-            result["ew_avg"] = result["ew_sum"] / result["readings_used"]
-            result["agg_wind_speed"] = math.sqrt(
-                math.pow(result["ns_avg"], 2) + math.pow(result["ew_avg"], 2)
-            )
-            result["agg_wind_direction"] = math.degrees(
-                math.atan2(result["ew_avg"], result["ns_avg"])
-            )
-            if result["agg_wind_direction"] < 0:
-                result["agg_wind_direction"] += 360
-            return result
+        def __init__(self) -> None:
+            self.forecast2hr = Forecast2hr()
+            self.forecast24hr = Forecast24hr()
+            self.forecast4day = Forecast4day()
+            self.temperature = Temperature()
+            self.humidity = Humidity()
+            self.wind = Wind()
+            self.query_time = datetime.now(timezone(timedelta(hours=8))).isoformat()

@@ -179,8 +179,9 @@ AREAS = [
 
 REGIONS = ["West", "East", "Central", "South", "North"]
 
-WEATHER_ENDPOINTS = {
+PRIMARY_ENDPOINTS = {
     "forecast2hr": "https://api.data.gov.sg/v1/environment/2-hour-weather-forecast",
+    "forecast24hr": "https://api.data.gov.sg/v1/environment/24-hour-weather-forecast",
     "temperature": "https://api.data.gov.sg/v1/environment/air-temperature",
     "humidity": "https://api.data.gov.sg/v1/environment/relative-humidity",
     "wind-direction": "https://api.data.gov.sg/v1/environment/wind-direction",
@@ -188,41 +189,12 @@ WEATHER_ENDPOINTS = {
     "forecast4day": "https://api.data.gov.sg/v1/environment/4-day-weather-forecast",
 }
 
-SECONDARY_WEATHER_ENDPOINTS = {
-    "forecast2hr": "https://www.nea.gov.sg/api/WeatherForecast/forecast24hrnowcast2hrs",
+SECONDARY_ENDPOINTS = {
+    "forecast2hr": "https://www.nea.gov.sg/api/WeatherForecast/forecast24hrnowcast2hrs/",
+    "forecast24hr": "https://www.nea.gov.sg/api/WeatherForecast/forecast24hrnowcast2hrs/",
     "temperature": "",
     "humidity": "",
     "wind-direction": "",
     "wind-speed": "",
-    "forecast4day": "https://www.nea.gov.sg/api/Weather4DayOutlook/GetData",
-}
-
-AREAS_ENDPOINTS = {
-    "forecast2hr": "https://api.data.gov.sg/v1/environment/2-hour-weather-forecast"
-}
-
-SECONDARY_AREAS_ENDPOINTS = {
-    "forecast2hr": "https://www.nea.gov.sg/api/WeatherForecast/forecast24hrnowcast2hrs"
-}
-
-REGION_ENDPOINTS = {
-    "forecast24hr": "https://api.data.gov.sg/v1/environment/24-hour-weather-forecast"
-}
-
-SECONDARY_REGION_ENDPOINTS = {"forecast24hr": ""}
-
-RAIN_ENDPOINTS = {}
-
-ENDPOINTS = {
-    CONF_WEATHER: WEATHER_ENDPOINTS,
-    CONF_AREAS: AREAS_ENDPOINTS,
-    CONF_REGION: REGION_ENDPOINTS,
-    CONF_RAIN: RAIN_ENDPOINTS,
-}
-
-SECONDARY_ENDPOINTS = {
-    CONF_WEATHER: SECONDARY_WEATHER_ENDPOINTS,
-    CONF_AREAS: SECONDARY_AREAS_ENDPOINTS,
-    CONF_REGION: SECONDARY_REGION_ENDPOINTS,
-    CONF_RAIN: RAIN_ENDPOINTS,
+    "forecast4day": "https://www.nea.gov.sg/api/Weather4DayOutlook/GetData/",
 }

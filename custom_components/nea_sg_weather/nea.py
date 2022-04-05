@@ -3,9 +3,9 @@ from __future__ import annotations
 from ast import Str
 import math
 from datetime import datetime, timedelta, timezone
+import logging
 
 import aiohttp
-import asyncio
 
 from homeassistant.components.weather import (
     ATTR_FORECAST_CONDITION,
@@ -30,6 +30,8 @@ for k, v in zip(
 ):
     INV_FORECAST_ICON_MAP_CONDITION[k] = v
 
+_LOGGER = logging.getLogger(__name__)
+
 
 def list_mean(values):
     """Function to calculate mean from list"""
@@ -53,11 +55,17 @@ class NeaData:
             .replace(microsecond=0)
             .isoformat()
         )
+        self.response = ""
         self._params = {"date_time": self.date_time}
         self._params2 = {}
         self._headers = HEADERS
         self._resp = ""
         self._resp2 = ""
+
+    async def async_init(self):
+        """Async function to await in main loop"""
+        await self.fetch_data(self.url, self.url2)
+        self.response = self._resp if self._resp2 == "" else self._resp2
 
     async def fetch_data(self, url1: Str, url2: Str):
         """GET response from url"""
@@ -67,6 +75,8 @@ class NeaData:
             ) as resp:
                 self._resp = await resp.json()
                 resp.raise_for_status()
+
+                # check if data response is too short
                 if resp.content_length > 100:
                     self.process_data()
                 else:
@@ -90,16 +100,15 @@ class Forecast2hr(NeaData):
     """Class for _forecast2hr_ data"""
 
     def __init__(self):
+        self.timestamp = ""
+        self.current_condition = ""
+        self.area_forecast = dict()
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["forecast2hr"],
             SECONDARY_ENDPOINTS["forecast2hr"]
             + str(round(datetime.utcnow().timestamp())),
         )
-        self.timestamp = ""
-        self.current_condition = ""
-        self.area_forecast = dict()
-        asyncio.run(self.fetch_data(self.url, self.url2))
 
     def process_data(self):
         # Update data timestamp
@@ -120,7 +129,7 @@ class Forecast2hr(NeaData):
             for forecast in self._resp["items"][0]["forecasts"]
         }
 
-        print("Data processed")
+        _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
     def process_secondary_data(self):
@@ -152,7 +161,7 @@ class Forecast2hr(NeaData):
             ]["Area"]
         }
 
-        print("Secondary data processed")
+        _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
         return
 
 
@@ -160,15 +169,14 @@ class Forecast24hr(NeaData):
     """Class for _forecast24hr_ data"""
 
     def __init__(self):
+        self.timestamp = ""
+        self.region_forecast = dict()
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["forecast24hr"],
             SECONDARY_ENDPOINTS["forecast24hr"]
             + str(round(datetime.utcnow().timestamp())),
         )
-        self.timestamp = ""
-        self.region_forecast = dict()
-        asyncio.run(self.fetch_data(self.url, self.url2))
 
     def process_data(self):
         # Update data timestamp
@@ -191,7 +199,7 @@ class Forecast24hr(NeaData):
                 _condition = period["regions"][region]
                 self.region_forecast[region] += [[_day + _time_of_day, _condition]]
 
-        print("Data processed")
+        _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
     def process_secondary_data(self):
@@ -215,7 +223,7 @@ class Forecast24hr(NeaData):
                     ],
                 ]
             ]
-        print("Secondary data processed")
+        _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
         return
 
 
@@ -223,14 +231,13 @@ class Forecast4day(NeaData):
     """Class for _forecast4day_ data"""
 
     def __init__(self):
+        self.forecast = list()
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["forecast4day"],
             SECONDARY_ENDPOINTS["forecast4day"]
             + str(round(datetime.utcnow().timestamp())),
         )
-        self.forecast = list()
-        asyncio.run(self.fetch_data(self.url, self.url2))
 
     def process_data(self):
         # Create 4-day forecast
@@ -248,7 +255,7 @@ class Forecast4day(NeaData):
                         }
                     )
                     break
-        print("Data processed")
+        _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
     def process_secondary_data(self):
@@ -277,7 +284,7 @@ class Forecast4day(NeaData):
                         }
                     )
                     break
-        print("Secondary data processed")
+        _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
         return
 
 
@@ -285,14 +292,13 @@ class Temperature(NeaData):
     """Class for _temperature_ data"""
 
     def __init__(self):
+        self.timestamp = ""
+        self.temp_avg = ""
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["temperature"],
             SECONDARY_ENDPOINTS["temperature"],
         )
-        self.timestamp = ""
-        self.temp_avg = ""
-        asyncio.run(self.fetch_data(self.url, self.url2))
 
     def process_data(self):
         # Update data timestamp
@@ -300,11 +306,11 @@ class Temperature(NeaData):
 
         self.temp_avg = list_mean(self._resp["items"][0]["readings"])
 
-        print("Data processed")
+        _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
     def process_secondary_data(self):
-        print("Secondary data processed")
+        _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
         return
 
 
@@ -312,25 +318,24 @@ class Humidity(NeaData):
     """Class for _humidity_ data"""
 
     def __init__(self):
+        self.timestamp = ""
+        self.humd_avg = ""
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["humidity"],
-            SECONDARY_ENDPOINTS["humidity"] + str(round(datetime.utcnow().timestamp())),
+            SECONDARY_ENDPOINTS["humidity"],
         )
-        self.timestamp = ""
-        self.humd_avg = ""
-        asyncio.run(self.fetch_data(self.url, self.url2))
 
     def process_data(self):
         # Update data timestamp
         self.timestamp = self._resp["items"][0]["timestamp"]
 
         self.humd_avg = list_mean(self._resp["items"][0]["readings"])
-        print("Data processed")
+        _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
     def process_secondary_data(self):
-        print("Secondary data processed")
+        _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
         return
 
 
@@ -338,15 +343,13 @@ class WindDirection(NeaData):
     """Class for _wind-direction_ data"""
 
     def __init__(self):
+        self.timestamp = ""
+        self.data = list()
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["wind-direction"],
-            SECONDARY_ENDPOINTS["wind-direction"]
-            + str(round(datetime.utcnow().timestamp())),
+            SECONDARY_ENDPOINTS["wind-direction"],
         )
-        self.timestamp = ""
-        self.data = list()
-        asyncio.run(self.fetch_data(self.url, self.url2))
 
     def process_data(self):
         # Update data timestamp
@@ -355,11 +358,11 @@ class WindDirection(NeaData):
         # Store wind direction data
         self.data = self._resp["items"][0]["readings"]
 
-        print("Data processed")
+        _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
     def process_secondary_data(self):
-        print("Secondary data processed")
+        _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
         return
 
 
@@ -367,15 +370,13 @@ class WindSpeed(NeaData):
     """Class for _wind-speed_ data"""
 
     def __init__(self):
+        self.timestamp = ""
+        self.data = list()
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["wind-speed"],
-            SECONDARY_ENDPOINTS["wind-speed"]
-            + str(round(datetime.utcnow().timestamp())),
+            SECONDARY_ENDPOINTS["wind-speed"],
         )
-        self.timestamp = ""
-        self.data = list()
-        asyncio.run(self.fetch_data(self.url, self.url2))
 
     def process_data(self):
         # Update data timestamp
@@ -384,11 +385,11 @@ class WindSpeed(NeaData):
         # Store wind speed data
         self.data = self._resp["items"][0]["readings"]
 
-        print("Data processed")
+        _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
     def process_secondary_data(self):
-        print("Secondary data processed")
+        _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
         return
 
 
@@ -398,6 +399,19 @@ class Wind:
     def __init__(self):
         self.direction = WindDirection()
         self.speed = WindSpeed()
+        self.wind_status: dict
+        self.wind_speed_avg: float
+        self.wind_dir_avg: float
+        self.response: dict
+
+    async def async_init(self):
+        """Async function to await in main loop"""
+        await self.direction.async_init()
+        await self.speed.async_init()
+        self.response = {
+            "wind_speed": self.speed.response,
+            "wind_direction": self.direction.response,
+        }
         self.wind_status = self.calc_wind_status(
             self.direction.data,
             self.speed.data,

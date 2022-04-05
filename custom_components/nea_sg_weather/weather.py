@@ -14,7 +14,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import NeaWeatherDataUpdateCoordinator
 from .const import ATTRIBUTION, DOMAIN, MAP_CONDITION
 
 _LOGGER = logging.getLogger(__name__)
@@ -88,7 +87,7 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
     @property
     def temperature(self):
         """Return the current average air temperature."""
-        return round(self.coordinator.data.temp_avg, 2)
+        return round(self.coordinator.data.temperature.temp_avg, 2)
 
     @property
     def temperature_unit(self):
@@ -98,32 +97,32 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
     @property
     def humidity(self):
         """Return the humidity."""
-        return round(self.coordinator.data.humd_avg, 2)
+        return round(self.coordinator.data.humidity.humd_avg, 2)
 
     @property
     def wind_speed(self):
         """Return the wind speed."""
-        return round(self.coordinator.data.wind_speed_avg * 1.852, 2)
+        return round(self.coordinator.data.wind.wind_speed_avg * 1.852, 2)
 
     @property
     def wind_bearing(self):
         """Return the wind bearing."""
-        return round(self.coordinator.data.wind_dir_avg)
+        return round(self.coordinator.data.wind.wind_dir_avg)
 
     @property
     def condition(self):
         """Return the weather condition based on the most common condition across all weather stations"""
-        return MAP_CONDITION.get(self.coordinator.data.current_condition)
+        return MAP_CONDITION.get(self.coordinator.data.forecast2hr.current_condition)
 
     @property
     def forecast(self):
         """Return the forecast array. Forecast API returns condition in a sentence, so we try to pick out keywords to map to a weather condition"""
-        return self.coordinator.data.forecast
+        return self.coordinator.data.forecast4day.forecast
 
     @property
     def extra_state_attributes(self) -> dict:
         """Return dict of additional properties to attach to sensors."""
-        return {"Updated at": self.coordinator.data.temp_timestamp}
+        return {"Updated at": self.coordinator.data.temperature.timestamp}
 
     @property
     def device_info(self) -> DeviceInfo:

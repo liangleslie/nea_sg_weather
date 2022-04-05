@@ -92,12 +92,12 @@ class NeaAreaSensor(CoordinatorEntity, SensorEntity):
     @property
     def state(self):
         """Return the weather condition."""
-        return self.coordinator.data.area_forecast[self._area]
+        return self.coordinator.data.forecast2hr.area_forecast[self._area]
 
     @property
     def extra_state_attributes(self) -> dict:
         """Return dict of additional properties to attach to sensors."""
-        return {"Updated at": self.coordinator.data.area_forecast_timestamp}
+        return {"Updated at": self.coordinator.data.forecast2hr.timestamp}
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -153,17 +153,21 @@ class NeaRegionSensor(CoordinatorEntity, SensorEntity):
     @property
     def state(self):
         """Return the weather condition."""
-        return self.coordinator.data.region_forecast[self._region.lower()][0][1]
+        return self.coordinator.data.forecast24hr.region_forecast[self._region.lower()][
+            0
+        ][1]
 
     @property
     def extra_state_attributes(self) -> dict:
         """Return dict of additional properties to attach to sensors."""
         _forecasts = {
             state[0]: state[1]
-            for state in self.coordinator.data.region_forecast[self._region.lower()]
+            for state in self.coordinator.data.forecast24hr.region_forecast[
+                self._region.lower()
+            ]
         }
         return {
-            "Updated at": self.coordinator.data.region_forecast_timestamp,
+            "Updated at": self.coordinator.data.forecast24hr.timestamp,
             **_forecasts,
         }
 
