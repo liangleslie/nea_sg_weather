@@ -147,10 +147,17 @@ class NeaRainCamera(Camera):
                         "%s rain map image not ready, trying previous images",
                         current_image_time,
                     )
-                    if current_image_time - 5 == self._last_image_time:
+
+                    # minor fix for whole hours
+                    if str(current_image_time)[-2:] == "00":
+                        _skip_minutes = 45
+                    else:
+                        _skip_minutes = 5
+
+                    if current_image_time - _skip_minutes == self._last_image_time:
                         return self._last_image
                     else:
-                        return await get_image(current_image_time - 5)
+                        return await get_image(current_image_time - _skip_minutes)
                 else:
                     _LOGGER.warning(
                         "Error getting new camera image for %s from %s: %s",
