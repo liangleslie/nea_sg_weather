@@ -241,6 +241,7 @@ class Forecast4day(NeaData):
 
     def process_data(self):
         # Create 4-day forecast
+        self.forecast = list()
         for entry in self._resp["items"][0]["forecasts"]:
             for forecast_condition, condition in FORECAST_MAP_CONDITION.items():
                 if forecast_condition in entry["forecast"].lower():
@@ -260,6 +261,7 @@ class Forecast4day(NeaData):
 
     def process_secondary_data(self):
         # Create 4-day forecast
+        self.forecast = list()
         _today = datetime.now(timezone(timedelta(hours=8))).replace(microsecond=0)
         _date_map = dict()
         for i in range(5):
