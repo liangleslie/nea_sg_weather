@@ -10,7 +10,12 @@ import httpx
 from requests.exceptions import ConnectionError as ConnectError, HTTPError, Timeout
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_SCAN_INTERVAL, CONF_SENSORS, CONF_TIMEOUT
+from homeassistant.const import (
+    CONF_SCAN_INTERVAL,
+    CONF_SENSORS,
+    CONF_TIMEOUT,
+    CONF_REGION,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -21,12 +26,12 @@ from .nea import (
     Temperature,
     Humidity,
     Wind,
+    Rain,
 )
 
 from .const import (
     CONF_AREAS,
     CONF_RAIN,
-    CONF_REGION,
     CONF_SENSOR,
     CONF_WEATHER,
     DEFAULT_SCAN_INTERVAL,
@@ -137,6 +142,7 @@ class NeaWeatherData:
                 self.data.temperature,
                 self.data.humidity,
                 self.data.wind,
+                self.data.rain,
             ]
         if self._config_entry.data[CONF_SENSORS].get(CONF_AREAS, ["None"]) != ["None"]:
             _data_objects += [self.data.forecast2hr]
@@ -162,4 +168,5 @@ class NeaWeatherData:
             self.temperature = Temperature()
             self.humidity = Humidity()
             self.wind = Wind()
+            self.rain = Rain()
             self.query_time = datetime.now(timezone(timedelta(hours=8))).isoformat()

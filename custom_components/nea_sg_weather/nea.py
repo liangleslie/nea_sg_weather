@@ -103,6 +103,7 @@ class Forecast2hr(NeaData):
         self.timestamp = ""
         self.current_condition = ""
         self.area_forecast = dict()
+        self.metadata = list()
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["forecast2hr"],
@@ -113,6 +114,7 @@ class Forecast2hr(NeaData):
     def process_data(self):
         # Update data timestamp
         self.timestamp = self._resp["items"][0]["timestamp"]
+        self.metadata = self._resp["area_metadata"]
 
         # Get most common weather condition across Singapore areas
         _current_condition_list = [
@@ -125,8 +127,14 @@ class Forecast2hr(NeaData):
 
         # Store area forecast data
         self.area_forecast = {
-            forecast["area"]: forecast["forecast"]
-            for forecast in self._resp["items"][0]["forecasts"]
+            self._resp["items"][0]["forecasts"][i]["area"]: {
+                "forecast": self._resp["items"][0]["forecasts"][i]["forecast"],
+                "location": {
+                    "latitude": self.metadata[i]["label_location"]["latitude"],
+                    "longitude": self.metadata[i]["label_location"]["longitude"],
+                },
+            }
+            for i in range(len(self._resp["items"][0]["forecasts"]))
         }
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
@@ -456,3 +464,43 @@ class Wind:
         if result["agg_wind_direction"] < 0:
             result["agg_wind_direction"] += 360
         return result
+
+
+class Rain(NeaData):
+    """Class for _rainfall_ data"""
+
+    def __init__(self):
+        self.timestamp = ""
+        self.data = list()
+        self.metadata = list()
+        NeaData.__init__(
+            self,
+            PRIMARY_ENDPOINTS["rainfall"],
+            SECONDARY_ENDPOINTS["rainfall"],
+        )
+
+    def process_data(self):
+        # Update data timestamp
+        self.timestamp = self._resp["items"][0]["timestamp"]
+
+        # Store rainfall data
+        resp_data = self._resp["items"][0]["readings"]
+        self.metadata = self._resp["metadata"]["stations"]
+
+        self.data = dict()
+        for i, reading in enumerate(resp_data):
+            self.data[reading["station_id"]] = {
+                "value": reading["value"],
+                "name": self.metadata[i]["name"],
+                "location": {
+                    "latitude": self.metadata[i]["location"]["latitude"],
+                    "longitude": self.metadata[i]["location"]["longitude"],
+                },
+            }
+
+        _LOGGER.debug("%s: Data processed", self.__class__.__name__)
+        return
+
+    def process_secondary_data(self):
+        _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
+        return

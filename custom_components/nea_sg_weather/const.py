@@ -14,7 +14,6 @@ from homeassistant.components.weather import (
     ATTR_CONDITION_WINDY,
     ATTR_CONDITION_WINDY_VARIANT,
 )
-from homeassistant.const import CONF_REGION
 
 CONF_AREAS = "areas"
 CONF_RAIN = "rain"
@@ -179,6 +178,76 @@ AREAS = [
 
 REGIONS = ["West", "East", "Central", "South", "North"]
 
+RAIN_SENSOR_ID = [
+    "S77",
+    "S109",
+    "S90",
+    "S114",
+    "S50",
+    "S107",
+    "S215",
+    "S118",
+    "S120",
+    "S33",
+    "S71",
+    "S43",
+    "S66",
+    "S112",
+    "S40",
+    "S108",
+    "S113",
+    "S44",
+    "S119",
+    "S121",
+    "S35",
+    "S94",
+    "S78",
+    "S106",
+    "S81",
+    "S201",
+    "S202",
+    "S203",
+    "S204",
+    "S205",
+    "S207",
+    "S208",
+    "S209",
+    "S210",
+    "S211",
+    "S212",
+    "S213",
+    "S214",
+    "S216",
+    "S217",
+    "S218",
+    "S219",
+    "S220",
+    "S221",
+    "S222",
+    "S223",
+    "S224",
+    "S226",
+    "S227",
+    "S228",
+    "S229",
+    "S230",
+    "S111",
+    "S900",
+    "S84",
+    "S79",
+    "S88",
+    "S123",
+    "S89",
+    "S115",
+    "S82",
+    "S24",
+    "S69",
+    "S08",
+    "S116",
+    "S104",
+    "S100",
+]
+
 PRIMARY_ENDPOINTS = {
     "forecast2hr": "https://api.data.gov.sg/v1/environment/2-hour-weather-forecast",
     "forecast24hr": "https://api.data.gov.sg/v1/environment/24-hour-weather-forecast",
@@ -187,6 +256,7 @@ PRIMARY_ENDPOINTS = {
     "wind-direction": "https://api.data.gov.sg/v1/environment/wind-direction",
     "wind-speed": "https://api.data.gov.sg/v1/environment/wind-speed",
     "forecast4day": "https://api.data.gov.sg/v1/environment/4-day-weather-forecast",
+    "rainfall": "https://api.data.gov.sg/v1/environment/rainfall",
 }
 
 SECONDARY_ENDPOINTS = {
@@ -197,4 +267,5 @@ SECONDARY_ENDPOINTS = {
     "wind-direction": "",
     "wind-speed": "",
     "forecast4day": "https://www.nea.gov.sg/api/Weather4DayOutlook/GetData/",
+    "rainfall": "",
 }
