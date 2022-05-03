@@ -473,6 +473,7 @@ class Rain(NeaData):
         self.timestamp = ""
         self.data = list()
         self.metadata = list()
+        self.station_list = list()
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["rainfall"],
@@ -486,6 +487,8 @@ class Rain(NeaData):
         # Store rainfall data
         resp_data = self._resp["items"][0]["readings"]
         self.metadata = self._resp["metadata"]["stations"]
+
+        self.station_list = [station["id"] for station in self.metadata]
 
         self.data = dict()
         for i, reading in enumerate(resp_data):

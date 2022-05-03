@@ -22,7 +22,6 @@ from .const import (
     FORECAST_ICON_BASE_URL,
     FORECAST_ICON_MAP_CONDITION,
     REGIONS,
-    RAIN_SENSOR_ID,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,10 +56,10 @@ async def async_setup_entry(
         ]
 
     # add rainfall sensor entities
-    if config_entry.data[CONF_SENSORS][CONF_REGION]:
+    if config_entry.data[CONF_SENSORS][CONF_RAIN]:
         entities_list += [
             NeaRainSensor(coordinator, config_entry.data, rain_sensor_id)
-            for rain_sensor_id in RAIN_SENSOR_ID
+            for rain_sensor_id in coordinator.data.rain.station_list
         ]
 
     async_add_entities(entities_list)
