@@ -127,11 +127,12 @@ class NeaWeatherData:
         """Initialize the data object."""
         self._hass = hass
         self._config_entry = config_entry
-        self.data = self.NeaData()
+        self.data: self.NeaData
 
     async def async_update(self) -> NeaData:
         """Get the latest data from NEA API for entities registered."""
         # Consolidate data requests to avoid redundant requests
+        self.data = self.NeaData()
         _data_objects = list()
         _response = dict()
         if self._config_entry.data[CONF_WEATHER]:
@@ -144,17 +145,20 @@ class NeaWeatherData:
                 self.data.wind,
                 self.data.rain,
             ]
-        if self._config_entry.data[CONF_SENSORS].get(CONF_AREAS, ["None"]) != ["None"]:
-            _data_objects += [self.data.forecast2hr]
-        if self._config_entry.data[CONF_SENSORS].get(CONF_REGION, False):
-            _data_objects += [self.data.forecast24hr]
+        else:
+            if self._config_entry.data[CONF_SENSORS].get(CONF_AREAS, ["None"]) != [
+                "None"
+            ]:
+                _data_objects += [self.data.forecast2hr]
+            if self._config_entry.data[CONF_SENSORS].get(CONF_REGION, False):
+                _data_objects += [self.data.forecast24hr]
         _data_objects = set(_data_objects)
 
         for data_object in _data_objects:
             await data_object.async_init()
             _response[data_object.__class__.__name__] = data_object.response
 
-        _LOGGER.debug("Data is: %s", _response)
+        # _LOGGER.debug("Data is: %s", _response)
         _LOGGER.debug("Coordinator was updated at %s", self.data.query_time)
         return self.data
 
