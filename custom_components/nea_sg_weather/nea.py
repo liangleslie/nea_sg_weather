@@ -423,8 +423,8 @@ class Wind:
             "wind_direction": self.direction.response,
         }
         self.wind_status = self.calc_wind_status(
-            self.direction.data,
             self.speed.data,
+            self.direction.data,
         )
         self.wind_speed_avg = self.wind_status["agg_wind_speed"]
         self.wind_dir_avg = self.wind_status["agg_wind_direction"]
