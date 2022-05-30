@@ -487,21 +487,18 @@ class Rain(NeaData):
 
         # Store rainfall data
         resp_data = self._resp["items"][0]["readings"]
-        self.metadata = self._resp["metadata"]["stations"]
 
         self.station_list = RAIN_SENSOR_LIST
-        _current_station_list = [
-            reading["station_id"] for reading in resp_data["items"][0]["readings"]
-        ]
+        _current_station_list = [reading["station_id"] for reading in resp_data]
 
         self.data = dict()
 
-        for station, i in enumerate(self.station_list):
+        for i, station in enumerate(self.station_list):
             station_id = station["id"]
             try:
                 j = _current_station_list.index(station_id)
                 self.data[station_id] = {
-                    "value": resp_data["items"][0]["readings"][j]["value"],
+                    "value": resp_data[j]["value"],
                     "name": self.station_list[i]["name"],
                     "location": self.station_list[i]["location"],
                 }

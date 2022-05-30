@@ -58,7 +58,7 @@ async def async_setup_entry(
     # add rainfall sensor entities
     if config_entry.data[CONF_SENSORS][CONF_RAIN]:
         entities_list += [
-            NeaRainSensor(coordinator, config_entry.data, rain_sensor_id)
+            NeaRainSensor(coordinator, config_entry.data, rain_sensor_id["id"])
             for rain_sensor_id in coordinator.data.rain.station_list
         ]
 
