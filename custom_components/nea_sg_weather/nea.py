@@ -22,6 +22,7 @@ from .const import (
     FORECAST_MAP_CONDITION,
     FORECAST_ICON_MAP_CONDITION,
     HEADERS,
+    RAIN_SENSOR_LIST,
 )
 
 INV_FORECAST_ICON_MAP_CONDITION = dict()
@@ -488,18 +489,29 @@ class Rain(NeaData):
         resp_data = self._resp["items"][0]["readings"]
         self.metadata = self._resp["metadata"]["stations"]
 
-        self.station_list = [station["id"] for station in self.metadata]
+        self.station_list = RAIN_SENSOR_LIST
+        _current_station_list = [
+            reading["station_id"] for reading in resp_data["items"][0]["readings"]
+        ]
 
         self.data = dict()
-        for i, reading in enumerate(resp_data):
-            self.data[reading["station_id"]] = {
-                "value": reading["value"],
-                "name": self.metadata[i]["name"],
-                "location": {
-                    "latitude": self.metadata[i]["location"]["latitude"],
-                    "longitude": self.metadata[i]["location"]["longitude"],
-                },
-            }
+
+        for station, i in enumerate(self.station_list):
+            station_id = station["id"]
+            try:
+                j = _current_station_list.index(station_id)
+                self.data[station_id] = {
+                    "value": resp_data["items"][0]["readings"][j]["value"],
+                    "name": self.station_list[i]["name"],
+                    "location": self.station_list[i]["location"],
+                }
+            except (KeyError, ValueError):
+                _LOGGER.debug("%s is missing, setting values as 0", station_id)
+                self.data[station_id] = {
+                    "value": 0,
+                    "name": self.station_list[i]["name"],
+                    "location": self.station_list[i]["location"],
+                }
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
