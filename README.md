@@ -29,3 +29,11 @@ For the overlays to display properly, you will need the `area`, `region` and `ra
 3. `lovelace.yaml`: preset card config to display the weather map card
 
 Instructions for how to integrate the `yaml` files are included in the various files in the `nea_sg_weather/yaml` folder.
+
+## Rainfall map
+
+Starting in v1.5, rainfall sensors have location attributes.
+Users can display sensors on a map card in Lovelace UI.
+
+For entity pictures to display correctly, copy all image files in `www/weather/` to your `config/www/weather/` folder.
+![image](https://user-images.githubusercontent.com/57534857/171048147-5e6dcfd3-40c4-4eff-a09c-f1f6c31ddb92.png)
