@@ -244,6 +244,29 @@ class NeaRainSensor(CoordinatorEntity, SensorEntity):
         return self.coordinator.data.rain.data[self._rain_sensor_id]["value"]
 
     @property
+    def entity_picture(self):
+        """Return the entity picture url to display rainfall quantity"""
+        rainfall_quantity = (
+            0
+            if self.state == 0
+            else 0.2
+            if self.state < 0.35
+            else 0.5
+            if self.state < 0.75
+            else 1
+            if self.state < 1.5
+            else 2
+            if self.state < 2.5
+            else 3
+            if self.state < 3.5
+            else 4
+            if self.state < 4.5
+            else 5
+        )
+
+        return "/local/weather/" + str(rainfall_quantity) + ".png"
+
+    @property
     def extra_state_attributes(self) -> dict:
         """Return dict of additional properties to attach to sensors."""
         return {
