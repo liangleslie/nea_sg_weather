@@ -7,7 +7,17 @@ from typing import Any
 
 from homeassistant.components.weather import WeatherEntity
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
-from homeassistant.const import CONF_NAME, CONF_SELECTOR, TEMP_CELSIUS
+from homeassistant.const import (
+    CONF_NAME,
+    CONF_SELECTOR,
+    TEMP_CELSIUS,
+    CONF_NAME,
+    LENGTH_MILLIMETERS,
+    PRESSURE_HPA,
+    SPEED_METERS_PER_SECOND,
+    SPEED_KNOTS,
+    TEMP_CELSIUS,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -54,6 +64,12 @@ async def async_setup_entry(
 class NeaWeather(CoordinatorEntity, WeatherEntity):
     """Representation of a weather condition."""
 
+    _attr_has_entity_name = True
+    _attr_native_temperature_unit = TEMP_CELSIUS
+    _attr_native_precipitation_unit = LENGTH_MILLIMETERS
+    _attr_native_pressure_unit = PRESSURE_HPA
+    _attr_native_wind_speed_unit = SPEED_KNOTS
+
     def __init__(
         self,
         coordinator,
@@ -85,14 +101,9 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
         return self._name
 
     @property
-    def temperature(self):
+    def native_temperature(self):
         """Return the current average air temperature."""
         return round(self.coordinator.data.temperature.temp_avg, 2)
-
-    @property
-    def temperature_unit(self):
-        """Return the unit of measurement."""
-        return TEMP_CELSIUS
 
     @property
     def humidity(self):
@@ -100,8 +111,9 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
         return round(self.coordinator.data.humidity.humd_avg, 2)
 
     @property
-    def wind_speed(self):
+    def native_wind_speed(self):
         """Return the wind speed."""
+        _LOGGER.debug(self.coordinator.data.wind.wind_speed_avg)
         return round(self.coordinator.data.wind.wind_speed_avg, 2)
 
     @property

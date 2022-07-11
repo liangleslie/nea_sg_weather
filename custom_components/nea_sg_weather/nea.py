@@ -14,6 +14,9 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_TIME,
     ATTR_FORECAST_WIND_BEARING,
     ATTR_FORECAST_WIND_SPEED,
+    ATTR_FORECAST_NATIVE_TEMP,
+    ATTR_FORECAST_NATIVE_TEMP_LOW,
+    ATTR_FORECAST_NATIVE_WIND_SPEED,
 )
 
 from .const import (
@@ -285,9 +288,15 @@ class Forecast4day(NeaData):
                     self.forecast.append(
                         {
                             ATTR_FORECAST_TIME: _date_map[entry["day"]],
-                            ATTR_FORECAST_TEMP: float(entry["temperature"][-4:-2]),
-                            ATTR_FORECAST_TEMP_LOW: float(entry["temperature"][:2]),
-                            ATTR_FORECAST_WIND_SPEED: int(entry["wind_speed"][-6:-4]),
+                            ATTR_FORECAST_NATIVE_TEMP: float(
+                                entry["temperature"][-4:-2]
+                            ),
+                            ATTR_FORECAST_NATIVE_TEMP_LOW: float(
+                                entry["temperature"][:2]
+                            ),
+                            ATTR_FORECAST_NATIVE_WIND_SPEED: int(
+                                entry["wind_speed"][-6:-4]
+                            ),
                             ATTR_FORECAST_WIND_BEARING: entry["wind_speed"].split(" ")[
                                 0
                             ],
