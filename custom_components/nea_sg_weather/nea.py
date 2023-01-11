@@ -81,15 +81,31 @@ class NeaData:
                 resp.raise_for_status()
 
                 # check if data response is too short
-                if resp.content_length > 100:
+                _LOGGER.debug(
+                    "%s: response received, length: %s",
+                    self.__class__.__name__,
+                    len(str(self._resp)),
+                )
+                if len(str(self._resp)) > 120:
                     self.process_data()
                 else:
-                    async with session.get(
-                        url2, params=self._params2, headers=self._headers
-                    ) as resp2:
-                        self._resp2 = await resp2.json()
-                        resp2.raise_for_status()
-                        self.process_secondary_data()
+                    _LOGGER.warning(
+                        "%s: Response from %s too short.",
+                        self.__class__.__name__,
+                        url1,
+                    )
+                    if url2 != "":
+                        _LOGGER.warning(
+                            "%s:  Scraping NEA website for alternative data: %s",
+                            self.__class__.__name__,
+                            url2,
+                        )
+                        async with session.get(
+                            url2, params=self._params2, headers=self._headers
+                        ) as resp2:
+                            self._resp2 = await resp2.json()
+                            resp2.raise_for_status()
+                    self.process_secondary_data()
 
     def process_data(self):
         """Function intended to be replaced by subclasses to process API response"""
@@ -185,19 +201,19 @@ class Forecast24hr(NeaData):
         self.region_forecast = dict()
         NeaData.__init__(
             self,
-            PRIMARY_ENDPOINTS["forecast24hr"],
             SECONDARY_ENDPOINTS["forecast24hr"]
             + str(round(datetime.utcnow().timestamp())),
+            PRIMARY_ENDPOINTS["forecast24hr"],
         )
 
-    def process_data(self):
+    def process_secondary_data(self):
         # Update data timestamp
-        self.timestamp = self._resp["items"][0]["timestamp"]
+        self.timestamp = self._resp2["items"][0]["timestamp"]
 
         # Create region forecast
-        for region in self._resp["items"][0]["periods"][0]["regions"].keys():
+        for region in self._resp2["items"][0]["periods"][0]["regions"].keys():
             self.region_forecast[region] = list()
-            for period in self._resp["items"][0]["periods"]:
+            for period in self._resp2["items"][0]["periods"]:
                 _time = datetime.fromisoformat(period["time"]["start"])
                 _now = datetime.now(timezone(timedelta(hours=8)))
                 _day = "Today " if _time.date() == _now.date() else "Tomorrow "
@@ -214,10 +230,11 @@ class Forecast24hr(NeaData):
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
-    def process_secondary_data(self):
+    def process_data(self):
+        _LOGGER.debug("process 24 hour data")
         # Update data timestamp
         _tmp_forecast_datetime = datetime.strptime(
-            self._resp2["Channel2HrForecast"]["Item"]["ForecastIssue"]["DateTimeStr"]
+            self._resp["Channel2HrForecast"]["Item"]["ForecastIssue"]["DateTimeStr"]
             + " 2022",
             "%I.%M%p %d %b %Y",
         ).replace(tzinfo=timezone(timedelta(hours=8)))
@@ -227,13 +244,12 @@ class Forecast24hr(NeaData):
         for region in ["east", "west", "north", "south", "central"]:
             self.region_forecast[region] = [
                 [
-                    self._resp2["Channel24HrForecast"]["Forecasts"][0]["TimePeriod"],
+                    self._resp["Channel24HrForecast"]["Forecasts"][i]["TimePeriod"],
                     INV_FORECAST_ICON_MAP_CONDITION[
-                        self._resp2["Channel24HrForecast"]["Forecasts"][0][
-                            "Wx" + region
-                        ]
+                        self._resp["Channel24HrForecast"]["Forecasts"][i]["Wx" + region]
                     ],
                 ]
+                for i in range(3)
             ]
         _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
         return
@@ -246,15 +262,15 @@ class Forecast4day(NeaData):
         self.forecast = list()
         NeaData.__init__(
             self,
-            PRIMARY_ENDPOINTS["forecast4day"],
             SECONDARY_ENDPOINTS["forecast4day"]
             + str(round(datetime.utcnow().timestamp())),
+            PRIMARY_ENDPOINTS["forecast4day"],
         )
 
-    def process_data(self):
+    def process_secondary_data(self):
         # Create 4-day forecast
         self.forecast = list()
-        for entry in self._resp["items"][0]["forecasts"]:
+        for entry in self._resp2["items"][0]["forecasts"]:
             for forecast_condition, condition in FORECAST_MAP_CONDITION.items():
                 if forecast_condition in entry["forecast"].lower():
                     self.forecast.append(
@@ -271,7 +287,8 @@ class Forecast4day(NeaData):
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
-    def process_secondary_data(self):
+    def process_data(self):
+        _LOGGER.debug("process 4 day data")
         # Create 4-day forecast
         self.forecast = list()
         _today = datetime.now(timezone(timedelta(hours=8))).replace(microsecond=0)
@@ -282,7 +299,7 @@ class Forecast4day(NeaData):
                 microsecond=0
             ).isoformat()
 
-        for entry in self._resp2:
+        for entry in self._resp:
             for forecast_condition, condition in FORECAST_MAP_CONDITION.items():
                 if forecast_condition in entry["forecast"].lower():
                     self.forecast.append(
@@ -339,7 +356,7 @@ class Humidity(NeaData):
 
     def __init__(self):
         self.timestamp = ""
-        self.humd_avg = ""
+        self.humd_avg = 0
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["humidity"],
@@ -350,7 +367,10 @@ class Humidity(NeaData):
         # Update data timestamp
         self.timestamp = self._resp["items"][0]["timestamp"]
 
-        self.humd_avg = list_mean(self._resp["items"][0]["readings"])
+        try:
+            self.humd_avg = list_mean(self._resp["items"][0]["readings"])
+        except:
+            self.humd_avg = 0
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
@@ -523,5 +543,19 @@ class Rain(NeaData):
         return
 
     def process_secondary_data(self):
+        _LOGGER.debug(
+            "%s: No data from data.gov.api, setting all values to 0",
+            self.__class__.__name__,
+        )
+        self.station_list = RAIN_SENSOR_LIST
+        self.data = dict()
+        for i, station in enumerate(self.station_list):
+            station_id = station["id"]
+            self.data[station_id] = {
+                "value": 0,
+                "name": self.station_list[i]["name"],
+                "location": self.station_list[i]["location"],
+            }
+
         _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
         return
