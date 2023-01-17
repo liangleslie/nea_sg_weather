@@ -591,7 +591,7 @@ class Weather:
 
             for forecast in data_24_hour_weather_forecast["Forecasts"]:
                 forecast_timeperiod = (
-                    forecast["TimePeriod"].replace("Midday", "12 pm").split(" to ")
+                    forecast["TimePeriod"].replace("Midday", "12 pm").replace("Midnight", "12 am").split(" to ")
                 )
                 period = {
                     "time": {
