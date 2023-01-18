@@ -22,7 +22,7 @@ simulated_resp = weather.api.json['24-hour-weather-forecast']
 
 from __future__ import annotations
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from dateutil import parser
 import math
@@ -243,7 +243,7 @@ class Weather:
             self.data = data.raw_resp["current"]["processed"]
             self.obs_datetime = parser.parse(
                 self.data["forecast_issue"].replace("Updated at ", "")
-            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+            ).strftime("%Y-%m-%dT%H:%M:%S+08:00")
             self.temperature_high = self.data["temperature_high"]
             self.temperature_low = self.data["temperature_low"]
             self.humidity_high = self.data["relative_humidity_high"]
@@ -469,7 +469,7 @@ class Weather:
             ]["Channel2HrForecast"]
             update_datetime_2_hour = parser.parse(
                 data_2_hour_weather_forecast["Item"]["ForecastIssue"]["DateTimeStr"]
-            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+            ).strftime("%Y-%m-%dT%H:%M:%S+08:00")
             valid_timestr_2_hour = (
                 data_2_hour_weather_forecast["Item"]["ValidTime"]
                 .replace(
@@ -486,10 +486,10 @@ class Weather:
                         "timestamp": update_datetime_2_hour,
                         "valid_period": {
                             "start": parser.parse(valid_timestr_2_hour[0]).strftime(
-                                "%Y-%m-%dT%H:%M:%SZ"
+                                "%Y-%m-%dT%H:%M:%S+08:00"
                             ),
                             "end": parser.parse(valid_timestr_2_hour[1]).strftime(
-                                "%Y-%m-%dT%H:%M:%SZ"
+                                "%Y-%m-%dT%H:%M:%S+08:00"
                             ),
                         },
                         "forecasts": [],
@@ -532,7 +532,7 @@ class Weather:
             ]["Channel24HrForecast"]
             update_datetime_24_hour = parser.parse(
                 data_24_hour_weather_forecast["Main"]["ForecastIssue"]["DateTimeStr"]
-            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+            ).strftime("%Y-%m-%dT%H:%M:%S+08:00")
             valid_timestr_24_hour = data_24_hour_weather_forecast["Main"][
                 "ValidTime"
             ].split(" - ")
@@ -544,10 +544,10 @@ class Weather:
                         "timestamp": update_datetime_24_hour,
                         "valid_period": {
                             "start": parser.parse(valid_timestr_24_hour[0]).strftime(
-                                "%Y-%m-%dT%H:%M:%SZ"
+                                "%Y-%m-%dT%H:%M:%S+08:00"
                             ),
                             "end": parser.parse(valid_timestr_24_hour[1]).strftime(
-                                "%Y-%m-%dT%H:%M:%SZ"
+                                "%Y-%m-%dT%H:%M:%S+08:00"
                             ),
                         },
                         "general": {
@@ -591,7 +591,10 @@ class Weather:
 
             for forecast in data_24_hour_weather_forecast["Forecasts"]:
                 forecast_timeperiod = (
-                    forecast["TimePeriod"].replace("Midday", "12 pm").split(" to ")
+                    forecast["TimePeriod"]
+                    .replace("Midday", "12 pm")
+                    .replace("Midnight", "12 am")
+                    .split(" to ")
                 )
                 period = {
                     "time": {
@@ -623,8 +626,15 @@ class Weather:
                 "processed"
             ]
             update_datetime_4_day = datetime.now().strftime(
-                "%Y-%m-%dT%H:%M:%SZ"
+                "%Y-%m-%dT%H:%M:%S+08:00"
             )  # NEA response does not include timestamp
+
+            next_7_days_map = {}
+            for i in range(7):
+                date = datetime.now() + timedelta(days=i)
+                next_7_days_map[(date.strftime("%a")).upper()] = date.strftime(
+                    "%Y-%m-%dT00:00:00+08:00"
+                )
 
             output = {
                 "api_info": {"status": "healthy"},
@@ -640,8 +650,8 @@ class Weather:
             for forecast in data_4_day_weather_forecast:
                 output["items"][0]["forecasts"].append(
                     {
-                        "date": "string",
-                        "timestamp": update_datetime_4_day,
+                        "date": next_7_days_map[forecast["day"]][:10],
+                        "timestamp": next_7_days_map[forecast["day"]],
                         "forecast": forecast["forecast"],
                         "relative_humidity": {
                             "low": math.nan,
@@ -691,7 +701,7 @@ class Weather:
                     {
                         "timestamp": parser.parse(
                             data["obs_datetime"].replace("Observations at", "")
-                        ).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        ).strftime("%Y-%m-%dT%H:%M:%S+08:00"),
                         "readings": [],
                     }
                 ],
@@ -721,11 +731,12 @@ class Weather:
                 else:
                     processed_value = float(station_data[weather_type]["value"])
 
-                output["items"][0]["readings"].append(
-                    {
-                        "station_id": station,
-                        "value": processed_value,
-                    }
-                )
+                if processed_value != math.nan:
+                    output["items"][0]["readings"].append(
+                        {
+                            "station_id": station,
+                            "value": processed_value,
+                        }
+                    )
 
             return output
