@@ -218,10 +218,8 @@ class Forecast24hr(NeaData):
         for region in self._resp["items"][0]["periods"][0]["regions"].keys():
             self.region_forecast[region] = list()
             for period in self._resp["items"][0]["periods"]:
-                _LOGGER.warning(period["time"]["start"])
                 _time = datetime.fromisoformat(period["time"]["start"])
                 _now = datetime.now(timezone(timedelta(hours=8)))
-                _LOGGER.warning(_now)
                 _day = "Today " if _time.date() == _now.date() else "Tomorrow "
                 _time_of_day = (
                     "morning"
