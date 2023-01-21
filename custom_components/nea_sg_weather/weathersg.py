@@ -470,11 +470,12 @@ class Weather:
             update_datetime_2_hour = parser.parse(
                 data_2_hour_weather_forecast["Item"]["ForecastIssue"]["DateTimeStr"]
             ).strftime("%Y-%m-%dT%H:%M:%S+08:00")
+
+            # replace midnight/midnight with time that can be parsed by parser
             valid_timestr_2_hour = (
                 data_2_hour_weather_forecast["Item"]["ValidTime"]
-                .replace(
-                    "Midnight", "12.00 am"
-                )  # replace midnight with time that can be parsed by parser
+                .replace("Midnight", "12.00 am")
+                .replace("Midday", "12.00 pm")
                 .split(" to ")
             )
             output = {
@@ -731,7 +732,7 @@ class Weather:
                 else:
                     processed_value = float(station_data[weather_type]["value"])
 
-                if processed_value != math.nan:
+                if not math.isnan(processed_value):
                     output["items"][0]["readings"].append(
                         {
                             "station_id": station,
