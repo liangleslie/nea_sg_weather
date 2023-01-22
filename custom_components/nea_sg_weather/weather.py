@@ -113,7 +113,6 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
     @property
     def native_wind_speed(self):
         """Return the wind speed."""
-        _LOGGER.debug(self.coordinator.data.wind.wind_speed_avg)
         return round(self.coordinator.data.wind.wind_speed_avg, 2)
 
     @property
