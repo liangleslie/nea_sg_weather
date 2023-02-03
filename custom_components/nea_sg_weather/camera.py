@@ -66,7 +66,6 @@ class NeaRainCamera(Camera):
         self._last_image_time_pretty = None
         self._last_image = None
         self._images = []
-        self._animated_image = None
         self._last_url = None
         self._platform = "camera"
         self._prefix = config[CONF_SENSORS][CONF_PREFIX]
@@ -236,7 +235,7 @@ class NeaRainCamera(Camera):
                         loop=0,
                     )
                     self._last_image = buff.getvalue()
-                return self._animated_image
+                return self._last_image
             except Exception as e:
                 _LOGGER.warning(
                     "Error %s", e
