@@ -8,6 +8,8 @@ from typing import Any
 from datetime import datetime, timezone, timedelta
 import math
 import httpx
+from PIL import Image
+import io
 
 from homeassistant.components.camera import Camera
 from homeassistant.config_entries import ConfigEntry
@@ -63,6 +65,8 @@ class NeaRainCamera(Camera):
         self._last_image_time = None
         self._last_image_time_pretty = None
         self._last_image = None
+        self._images = []
+        self._animated_image = None
         self._last_url = None
         self._platform = "camera"
         self._prefix = config[CONF_SENSORS][CONF_PREFIX]
@@ -104,39 +108,84 @@ class NeaRainCamera(Camera):
         """Return a still image response from the camera."""
 
         async def get_image(current_image_time: int) -> bytes | None:
-            url = RAIN_MAP_URL_PREFIX + str(current_image_time) + RAIN_MAP_URL_SUFFIX
-            _LOGGER.debug("Getting rain map image from %s", url)
+            # get initial set of images
+            next_image_url = (
+                RAIN_MAP_URL_PREFIX + str(current_image_time) + RAIN_MAP_URL_SUFFIX
+            )
+            initial_images_url = "http://www.weather.gov.sg/weather-rain-area-50km/"
             try:
-                async_client = get_async_client(self.hass, verify_ssl=self.verify_ssl)
-                response = await async_client.get(url, headers=RAIN_MAP_HEADERS)
-                response.raise_for_status()
-                self._last_image = response.content
+                if self._images == []:
+                    _LOGGER.debug("Getting initial images from %s", initial_images_url)
+                    async_client = get_async_client(
+                        self.hass, verify_ssl=self.verify_ssl
+                    )
+                    response = await async_client.get(
+                        initial_images_url, headers=RAIN_MAP_HEADERS
+                    )
+                    response.raise_for_status()
+                    initial_images_urls_str = response.text[
+                        response.text.find('slideshowimages("')
+                        + len('slideshowimages("') :
+                    ]
+                    initial_images_urls_str = initial_images_urls_str[
+                        : initial_images_urls_str.find(");")
+                    ]
+                    initial_images_urls = initial_images_urls_str.replace(
+                        '"', ""
+                    ).split(",")
+                    for next_image_url in initial_images_urls[1:]:  # skip first image
+                        response = await async_client.get(
+                            next_image_url, headers=RAIN_MAP_HEADERS
+                        )
+                        response.raise_for_status()
+                        frame = Image.open(io.BytesIO(response.content))
+                        self._images.append(frame)
+                    _LOGGER.debug(
+                        "Initial rain map images successfully updated at %s, %s frames downloaded",
+                        datetime.strptime(
+                            str(current_image_time), "%Y%m%d%H%M"
+                        ).isoformat(),
+                        len(initial_images_urls),
+                    )
+                else:
+                    _LOGGER.debug("Getting rain map image from %s", next_image_url)
+                    async_client = get_async_client(
+                        self.hass, verify_ssl=self.verify_ssl
+                    )
+                    response = await async_client.get(
+                        next_image_url, headers=RAIN_MAP_HEADERS
+                    )
+                    response.raise_for_status()
+                    frame = Image.open(io.BytesIO(response.content))
+                    self._images.append(frame)
+                    _LOGGER.debug(
+                        "Rain map image successfully updated at %s, new URL is %s",
+                        datetime.strptime(
+                            str(current_image_time), "%Y%m%d%H%M"
+                        ).isoformat(),
+                        next_image_url,
+                    )
+                # self._last_image = response.content
                 self._last_image_time = current_image_time
                 self._last_image_time_pretty = datetime.strptime(
                     str(current_image_time), "%Y%m%d%H%M"
                 ).isoformat()
-                self._last_url = url
+                self._last_url = next_image_url
                 # Update timestamp from external coordinator entity
                 self._last_state = self.hass.states.get(self.entity_id).state
                 self._last_attributes = self.hass.states.get(self.entity_id).attributes
                 self._updated_attributes = dict(self._last_attributes)
                 self._updated_attributes["Updated at"] = self._last_image_time_pretty
-                self._updated_attributes["URL"] = url
+                self._updated_attributes["URL"] = next_image_url
                 self.hass.states.async_set(
                     self.entity_id, self._last_state, self._updated_attributes
                 )
-                _LOGGER.debug(
-                    "Rain map image successfully updated at %s, new URL is %s",
-                    datetime.strptime(
-                        str(current_image_time), "%Y%m%d%H%M"
-                    ).isoformat(),
-                    url,
-                )
-                return self._last_image
 
             except httpx.TimeoutException:
                 _LOGGER.warning(
-                    "Timeout getting camera image for %s from %s", self._name, url
+                    "Timeout getting camera image for %s from %s",
+                    self._name,
+                    next_image_url,
                 )
                 return self._last_image
 
@@ -162,10 +211,36 @@ class NeaRainCamera(Camera):
                     _LOGGER.warning(
                         "Error getting new camera image for %s from %s: %s",
                         self._name,
-                        url,
+                        next_image_url,
                         err,
                     )
                     return self._last_image
+
+            # created animated gif
+            try:
+                if len(self._images) > 24:  # drop older frames when we have enough
+                    self._images = self._images[-24:]
+                if len(self._images) == 24:
+                    _LOGGER.debug(
+                        "Converting %s frames into animated gif", len(self._images)
+                    )
+                    buff = io.BytesIO()
+                    self._images[0].save(
+                        buff,
+                        format="GIF",
+                        save_all=True,
+                        append_images=self._images[1:],
+                        optimize=False,
+                        duration=[100] * 23 + [1000],  # pause on last frame
+                        disposal=2,
+                        loop=0,
+                    )
+                    self._last_image = buff.getvalue()
+                return self._animated_image
+            except Exception as e:
+                _LOGGER.warning(
+                    "Error %s", e
+                )  # leaving this here for now in case something unexpected happens
 
         _current_query_time = int(
             datetime.strftime(datetime.now(timezone(timedelta(hours=8))), "%Y%m%d%H%M")
