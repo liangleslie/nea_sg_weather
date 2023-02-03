@@ -1,6 +1,7 @@
 """Support for retrieving weather data from NEA."""
 from __future__ import annotations
-
+from PIL import Image
+import io
 import asyncio
 import logging
 from types import MappingProxyType
@@ -63,6 +64,7 @@ class NeaRainCamera(Camera):
         self._last_image_time = None
         self._last_image_time_pretty = None
         self._last_image = None
+        self._images = []
         self._last_url = None
         self._platform = "camera"
         self._prefix = config[CONF_SENSORS][CONF_PREFIX]
@@ -132,6 +134,17 @@ class NeaRainCamera(Camera):
                     ).isoformat(),
                     url,
                 )
+                frame = Image.open(io.BytesIO(response.content))
+                self._images.append(frame)
+                # drop older frames when we have enough
+                if len(self._images) > 12:
+                    self._images = self._images[1:]
+                # create animated gif of rain map
+                if len(self._images) > 1:
+                    _LOGGER.debug("Converting frames to gif")
+                    buff = io.BytesIO()
+                    self._images[0].save(buff, format='GIF', save_all=True, append_images=self._images[1:], optimize=False, duration=1000, disposal=2, loop=0)
+                    self._last_image = buff.getvalue()
                 return self._last_image
 
             except httpx.TimeoutException:
