@@ -11,12 +11,9 @@ from homeassistant.const import (
     CONF_NAME,
     CONF_SELECTOR,
     TEMP_CELSIUS,
-    CONF_NAME,
     LENGTH_MILLIMETERS,
     PRESSURE_HPA,
-    SPEED_METERS_PER_SECOND,
     SPEED_KNOTS,
-    TEMP_CELSIUS,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
@@ -64,7 +61,6 @@ async def async_setup_entry(
 class NeaWeather(CoordinatorEntity, WeatherEntity):
     """Representation of a weather condition."""
 
-    _attr_has_entity_name = True
     _attr_native_temperature_unit = TEMP_CELSIUS
     _attr_native_precipitation_unit = LENGTH_MILLIMETERS
     _attr_native_pressure_unit = PRESSURE_HPA
@@ -82,7 +78,7 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
 
     @property
     def available(self):
-        """Return if weather data is available from Dark Sky."""
+        """Return if weather data is available"""
         return self.coordinator.data is not None
 
     @property
@@ -91,7 +87,7 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
         return ATTRIBUTION
 
     @property
-    def unique_id(self) -> str:
+    def unique_id(self):
         """Return unique ID."""
         return self._name
 
