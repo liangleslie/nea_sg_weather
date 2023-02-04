@@ -14,7 +14,7 @@ Follow the integration config flow to set up the following entities:
 - `weather`: weather entity with 4 day forecasts
 - `area` (town) sensors: current weather conditions for up to 47 areas/towns in Singapore 
 - `region` sensors: 24 weather condition forecast for North/South/East/West/Central regions of Singapore
-- `rain` camera: rain map overlay that is updated every 5 minutes from NEA
+- `rain` camera: 2 camera entities for static and animated rain map overlays that are updated every 5 minutes from NEA
 
 
 ## Weather Map Overlays

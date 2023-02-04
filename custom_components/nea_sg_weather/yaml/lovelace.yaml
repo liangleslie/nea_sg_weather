@@ -13,7 +13,8 @@
                 state: "on"
             elements:
             - type: image
-              camera_image: camera.singapore_weather_rain_map
+              camera_image: camera.singapore_weather_animated_rain_map # for animated rain maps
+              # camera_image: camera.singapore_weather_rain_map # for static rain maps
               style:
                 position: absolute
                 width: 100%
@@ -23,7 +24,8 @@
               tap_action: none
               hold_action: none
             - type: state-label
-              entity: camera.singapore_weather_rain_map
+              entity: camera.singapore_weather_animated_rain_map # for animated rain maps
+              # entity: camera.singapore_weather_rain_map # for static rain maps
               attribute: Updated at
               style:
                 position: absolute
