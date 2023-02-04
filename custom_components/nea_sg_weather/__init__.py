@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import logging
+import asyncio
 
 from aiohttp.client_reqrep import ClientResponse
 from async_timeout import timeout
@@ -28,6 +29,8 @@ from .nea import (
     Wind,
     Rain,
 )
+
+from .weathersg import Weather
 
 from .const import (
     CONF_AREAS,
@@ -123,16 +126,17 @@ class NeaWeatherDataUpdateCoordinator(DataUpdateCoordinator):
 class NeaWeatherData:
     """Get the latest data from NEA API."""
 
-    def __init__(self, hass, config_entry):
+    def __init__(self, hass: HomeAssistant, config_entry):
         """Initialize the data object."""
         self._hass = hass
         self._config_entry = config_entry
         self.data: self.NeaData
+        self.weather: Weather
 
     async def async_update(self) -> NeaData:
         """Get the latest data from NEA API for entities registered."""
         # Consolidate data requests to avoid redundant requests
-        self.data = self.NeaData()
+        self.data = await self._hass.async_add_executor_job(self.NeaData)
         _data_objects = list()
         _response = dict()
         if self._config_entry.data[CONF_WEATHER]:
@@ -166,11 +170,12 @@ class NeaWeatherData:
         """Container for Weather data"""
 
         def __init__(self) -> None:
-            self.forecast2hr = Forecast2hr()
-            self.forecast24hr = Forecast24hr()
-            self.forecast4day = Forecast4day()
-            self.temperature = Temperature()
-            self.humidity = Humidity()
-            self.wind = Wind()
-            self.rain = Rain()
+            self.weather = Weather()
+            self.forecast2hr = Forecast2hr(self.weather)
+            self.forecast24hr = Forecast24hr(self.weather)
+            self.forecast4day = Forecast4day(self.weather)
+            self.temperature = Temperature(self.weather)
+            self.humidity = Humidity(self.weather)
+            self.wind = Wind(self.weather)
+            self.rain = Rain(self.weather)
             self.query_time = datetime.now(timezone(timedelta(hours=8))).isoformat()
