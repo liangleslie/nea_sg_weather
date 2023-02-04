@@ -257,6 +257,9 @@ class NeaAnimatedRainCamera(Camera):
         """Return an animated gif response from the camera."""
 
         async def get_image(current_gif_time: int) -> bytes | None:
+            next_image_url = (
+                RAIN_MAP_URL_PREFIX + str(current_gif_time) + RAIN_MAP_URL_SUFFIX
+            )
             # get initial set of images
             try:
                 if self._gifs == [] or (current_gif_time - self._last_gif_time > 5):
