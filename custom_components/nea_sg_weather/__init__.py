@@ -68,14 +68,16 @@ def get_platforms(config_entry: ConfigEntry) -> dict:
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
-    """Set up Met as config entry."""
+    """Set up nea_sg_weather as config entry."""
     coordinator = NeaWeatherDataUpdateCoordinator(hass, config_entry)
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
 
     _platforms = get_platforms(config_entry)["platforms"]
-    hass.config_entries.async_setup_platforms(config_entry, _platforms)
+    hass.async_add_job(
+        hass.config_entries.async_forward_entry_setups(config_entry, _platforms)
+    )
 
     return True
 
