@@ -135,7 +135,7 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
     def device_info(self) -> DeviceInfo:
         """Device info."""
         return DeviceInfo(
-            default_name="Weather forecast coordinator",
+            name="Weather forecast coordinator",
             identifiers={(DOMAIN,)},  # type: ignore[arg-type]
             manufacturer="NEA Weather",
             model="data.gov.sg API Polling",
