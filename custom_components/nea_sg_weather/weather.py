@@ -5,7 +5,11 @@ import logging
 from types import MappingProxyType
 from typing import Any
 
-from homeassistant.components.weather import WeatherEntity
+from homeassistant.components.weather import (
+    Forecast,
+    WeatherEntity,
+    WeatherEntityFeature,
+)
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import (
     CONF_NAME,
@@ -65,6 +69,8 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
     _attr_native_precipitation_unit = LENGTH_MILLIMETERS
     _attr_native_pressure_unit = PRESSURE_HPA
     _attr_native_wind_speed_unit = SPEED_KNOTS
+    _attr_supported_features = (WeatherEntityFeature.FORECAST_DAILY
+                                | WeatherEntityFeature.FORECAST_HOURLY)
 
     def __init__(
         self,
@@ -140,3 +146,16 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
             manufacturer="NEA Weather",
             model="data.gov.sg API Polling",
         )
+
+    async def async_forecast_daily(self) -> list[Forecast] | None:
+        """Return the daily forecast in native units.
+        Only implement this method if `WeatherEntityFeature.FORECAST_DAILY` is set
+        """
+        return self.coordinator.data.forecast24hr.forecast
+
+    async def async_forecast_hourly(self) -> list[Forecast] | None:
+        """Return the hourly forecast in native units.
+        We do not have hourly forecast data so 2 hourly will do
+        Only implement this method if `WeatherEntityFeature.FORECAST_HOURLY` is set
+        """
+        return self.coordinator.data.forecast2hr.forecast
