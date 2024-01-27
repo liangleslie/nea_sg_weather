@@ -330,7 +330,7 @@ class Temperature(NeaData):
 
     def __init__(self):
         self.timestamp = ""
-        self.temp_avg = ""
+        self.temp_avg = 0
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["temperature"],
