@@ -99,13 +99,18 @@ CODE_DESCRIPTION_MAP = {
     "WS": "Windy, Showers",
 }
 
+_latest_timestamp = str(int(str(round(datetime.now().timestamp()))[:-2])//3*3)+"00" # API endpoint only accepts time rounded to nearest 5min
+nea_headers = {
+  "referer": "https://www.nea.gov.sg/"
+}
+
 GET_ENDPOINTS = {
     "4day": "https://www.nea.gov.sg/api/Weather4DayOutlook/GetData/"
-    + str(round(datetime.now().timestamp())),
+    + _latest_timestamp,
     "24hr": "https://www.nea.gov.sg/api/WeatherForecast/forecast24hrnowcast2hrs/"
-    + str(round(datetime.now().timestamp())),
+    + _latest_timestamp,
     "current": "https://www.nea.gov.sg/api/Weather24hrs/GetData/"
-    + str(round(datetime.now().timestamp())),
+    + _latest_timestamp,
     "temperature": "http://www.weather.gov.sg/weather-currentobservations-temperature/",
     "humidity": "http://www.weather.gov.sg/weather-currentobservations-relative-humidity/",
     "wind": "http://www.weather.gov.sg/weather-currentobservations-wind/",
@@ -167,11 +172,12 @@ class Weather:
             self.raw_resp = {}
             for k, v in GET_ENDPOINTS.items():
                 self.raw_resp[k] = {}
-                self.raw_resp[k]["raw"] = requests.get(GET_ENDPOINTS[k])
-                try:  # process NEA jsons
+                if GET_ENDPOINTS[k][:23] == "https://www.nea.gov.sg/" :
+                    self.raw_resp[k]["raw"] = requests.get(GET_ENDPOINTS[k],headers=nea_headers)
                     self.raw_resp[k]["processed"] = self.raw_resp[k]["raw"].json()
                     # print(k + ": json stored")
-                except requests.exceptions.JSONDecodeError:  # scrape data from weather.sg
+                else: # scrape data from weather.sg
+                    self.raw_resp[k]["raw"] = requests.get(GET_ENDPOINTS[k])
                     self.raw_resp[k]["processed"] = {}
                     soup = BeautifulSoup(self.raw_resp[k]["raw"].content, "html.parser")
                     self.raw_resp[k]["obs_datetime"] = soup.find(class_="date-obs").text
