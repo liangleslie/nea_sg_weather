@@ -151,11 +151,11 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
         """Return the daily forecast in native units.
         Only implement this method if `WeatherEntityFeature.FORECAST_DAILY` is set
         """
-        return self.coordinator.data.forecast24hr.forecast
+        return self.coordinator.data.forecast4day.forecast
 
     async def async_forecast_hourly(self) -> list[Forecast] | None:
         """Return the hourly forecast in native units.
         We do not have hourly forecast data so 2 hourly will do
         Only implement this method if `WeatherEntityFeature.FORECAST_HOURLY` is set
         """
-        return self.coordinator.data.forecast2hr.forecast
+        return self.coordinator.data.forecast2hr.area_forecast
