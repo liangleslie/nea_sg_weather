@@ -14,10 +14,10 @@ from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import (
     CONF_NAME,
     CONF_SELECTOR,
-    TEMP_CELSIUS,
-    LENGTH_MILLIMETERS,
-    PRESSURE_HPA,
-    SPEED_KNOTS,
+    UnitOfTemperature,
+    UnitOfLength,
+    UnitOfPressure,
+    UnitOfSpeed,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
@@ -65,10 +65,10 @@ async def async_setup_entry(
 class NeaWeather(CoordinatorEntity, WeatherEntity):
     """Representation of a weather condition."""
 
-    _attr_native_temperature_unit = TEMP_CELSIUS
-    _attr_native_precipitation_unit = LENGTH_MILLIMETERS
-    _attr_native_pressure_unit = PRESSURE_HPA
-    _attr_native_wind_speed_unit = SPEED_KNOTS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_precipitation_unit = UnitOfLength.MILLIMETERS
+    _attr_native_pressure_unit = UnitOfPressure.HPA
+    _attr_native_wind_speed_unit = UnitOfSpeed.KNOTS
     _attr_supported_features = (WeatherEntityFeature.FORECAST_DAILY
                                 | WeatherEntityFeature.FORECAST_HOURLY)
 
