@@ -11,7 +11,7 @@ import httpx
 from PIL import Image
 import io
 
-from homeassistant.components.camera import Camera
+from homeassistant.components.camera import Camera, CameraEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME, CONF_PREFIX, CONF_SENSORS
 from homeassistant.core import HomeAssistant
@@ -60,7 +60,7 @@ class NeaRainCamera(Camera):
         self.coordinator = coordinator
         self._name = config.get(CONF_NAME) + " Rain Map"
         self._limit_refetch = True
-        self._supported_features = 0
+        self._supported_features = CameraEntityFeature(0)
         self.content_type = "image/png"
         self.verify_ssl = True
         self._last_query_time = None
