@@ -26,6 +26,8 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from dateutil import parser
 import math
+import logging
+
 
 CODE_CONDITION_MAP = {
     "BR": "fog",
@@ -100,8 +102,14 @@ CODE_DESCRIPTION_MAP = {
 }
 
 _latest_timestamp = str(int(str(round(datetime.now().timestamp()))[:-2])//3*3)+"00" # API endpoint only accepts time rounded to nearest 5min
-nea_headers = {
+NEA_HEADERS = {
   "referer": "https://www.nea.gov.sg/"
+}
+
+WEATHERSG_HEADERS = {
+    "authority": "www.weather.gov.sg",
+    "referer": "www.weather.gov.sg",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36",
 }
 
 GET_ENDPOINTS = {
@@ -111,17 +119,17 @@ GET_ENDPOINTS = {
     + _latest_timestamp,
     "current": "https://www.nea.gov.sg/api/Weather24hrs/GetData/"
     + _latest_timestamp,
-    "temperature": "http://www.weather.gov.sg/weather-currentobservations-temperature/",
-    "humidity": "http://www.weather.gov.sg/weather-currentobservations-relative-humidity/",
-    "wind": "http://www.weather.gov.sg/weather-currentobservations-wind/",
-    "rainfall": "http://www.weather.gov.sg/weather-currentobservations-rainfall/",
+    "temperature": "https://www.weather.gov.sg/weather-currentobservations-temperature/",
+    "humidity": "https://www.weather.gov.sg/weather-currentobservations-relative-humidity/",
+    "wind": "https://www.weather.gov.sg/weather-currentobservations-wind/",
+    "rainfall": "https://www.weather.gov.sg/weather-currentobservations-rainfall/",
 }
 
 POST_ENDPOINTS = {
-    "temperature": "http://www.weather.gov.sg/wp-content/themes/wiptheme/page-functions/functions-ajax-temperature-chart.php",
-    "humidity": "http://www.weather.gov.sg/wp-content/themes/wiptheme/page-functions/functions-ajax-relative-humidity-chart.php",
-    "wind": "http://www.weather.gov.sg/wp-content/themes/wiptheme/page-functions/functions-ajax-wind-chart.php",
-    "rainfall": "http://www.weather.gov.sg/wp-content/themes/wiptheme/page-functions/functions-weather-current-observations-rainfall-ajax.php",
+    "temperature": "https://www.weather.gov.sg/wp-content/themes/wiptheme/page-functions/functions-ajax-temperature-chart.php",
+    "humidity": "https://www.weather.gov.sg/wp-content/themes/wiptheme/page-functions/functions-ajax-relative-humidity-chart.php",
+    "wind": "https://www.weather.gov.sg/wp-content/themes/wiptheme/page-functions/functions-ajax-wind-chart.php",
+    "rainfall": "https://www.weather.gov.sg/wp-content/themes/wiptheme/page-functions/functions-weather-current-observations-rainfall-ajax.php",
 }
 
 REALTIME_WEATHER_CONST = {
@@ -147,12 +155,12 @@ WIND_DIR_TO_DEG_MAP = {
     "": math.nan,
 }
 
+_LOGGER = logging.getLogger(__name__)
 
 class Weather:
     """
     Main class to easily access weather objects
     """
-
     def __init__(self) -> None:
         self.data = self.WeatherData()
         self.stations = self.Stations(self.data)
@@ -166,18 +174,18 @@ class Weather:
         """
         Class to hold raw responses from endpoints
         """
-
         def __init__(self) -> None:
             # get data from NEA API
             self.raw_resp = {}
             for k, v in GET_ENDPOINTS.items():
+                _LOGGER.debug(f"Getting {k}: {v}")
                 self.raw_resp[k] = {}
                 if GET_ENDPOINTS[k][:23] == "https://www.nea.gov.sg/" :
-                    self.raw_resp[k]["raw"] = requests.get(GET_ENDPOINTS[k],headers=nea_headers)
+                    self.raw_resp[k]["raw"] = requests.get(GET_ENDPOINTS[k],headers=NEA_HEADERS)
                     self.raw_resp[k]["processed"] = self.raw_resp[k]["raw"].json()
                     # print(k + ": json stored")
                 else: # scrape data from weather.sg
-                    self.raw_resp[k]["raw"] = requests.get(GET_ENDPOINTS[k])
+                    self.raw_resp[k]["raw"] = requests.get(GET_ENDPOINTS[k],headers=WEATHERSG_HEADERS)
                     self.raw_resp[k]["processed"] = {}
                     soup = BeautifulSoup(self.raw_resp[k]["raw"].content, "html.parser")
                     self.raw_resp[k]["obs_datetime"] = soup.find(class_="date-obs").text
@@ -189,6 +197,7 @@ class Weather:
                         raw_stations_metadata = self.raw_resp[k]["raw"].text.split(
                             '{stationCode:"'
                         )[1:]
+
 
                     else:
                         raw_stations_metadata = self.raw_resp[k]["raw"].text.split(
@@ -222,7 +231,7 @@ class Weather:
                         self.raw_resp[k]["processed"][station_reading["id"]][
                             "station_name"
                         ] = BeautifulSoup(
-                            station_reading["data-content"], "html.parser"
+                            station_reading["data-bs-content"], "html.parser"
                         ).strong.text
                         self.raw_resp[k]["processed"][station_reading["id"]][
                             "value"
@@ -238,7 +247,8 @@ class Weather:
                             self.raw_resp[k]["processed"][station_reading["id"]][
                                 "direction"
                             ] = station_reading.img["alt"]
-                    # print(k + ": processed html with BeautifulSoup")
+                _LOGGER.debug(f"{k}: {self.raw_resp[k]}")
+                _LOGGER.debug(f"{k}: processed html with BeautifulSoup")
 
     class Current:
         """

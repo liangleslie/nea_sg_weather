@@ -52,6 +52,7 @@ class NeaData:
     """Class for NEA data objects"""
 
     def __init__(self, weather: Weather, url: Str) -> None:
+        _LOGGER.debug(f"{self.__class__.__name__}: processing Weather data")
         self.weather = weather
         self.url = url
         self.date_time = (

@@ -173,6 +173,7 @@ class NeaWeatherData:
 
         def __init__(self) -> None:
             self.weather = Weather()
+            _LOGGER.debug(f"Weather data initiated: {self.weather}")
             self.forecast2hr = Forecast2hr(self.weather)
             self.forecast24hr = Forecast24hr(self.weather)
             self.forecast4day = Forecast4day(self.weather)

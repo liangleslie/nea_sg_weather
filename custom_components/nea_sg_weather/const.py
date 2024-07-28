@@ -36,7 +36,7 @@ RAIN_MAP_HEADERS = {
 }
 RAIN_MAP_URL_PREFIX = "https://www.weather.gov.sg/files/rainarea/50km/v2/dpsri_70km_"
 RAIN_MAP_URL_SUFFIX = "0000dBR.dpsri.png"
-RAIN_MAP_GIF_URL = "http://www.weather.gov.sg/weather-rain-area-50km/"
+RAIN_MAP_GIF_URL = "https://www.weather.gov.sg/weather-rain-area-50km/"
 
 FORECAST_ICON_BASE_URL = "https://www.nea.gov.sg/assets/images/icons/weather-bg/"
 
