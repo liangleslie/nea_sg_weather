@@ -2,7 +2,7 @@
 from __future__ import annotations
 from ast import Str
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 import logging
 
 import aiohttp
@@ -128,7 +128,7 @@ class Forecast2hr(NeaData):
             self,
             PRIMARY_ENDPOINTS["forecast2hr"],
             SECONDARY_ENDPOINTS["forecast2hr"]
-            + str(round(datetime.utcnow().timestamp())),
+            + str(round(datetime.now(UTC).timestamp())),
         )
 
     def process_data(self):
@@ -202,7 +202,7 @@ class Forecast24hr(NeaData):
         NeaData.__init__(
             self,
             SECONDARY_ENDPOINTS["forecast24hr"]
-            + str(round(datetime.utcnow().timestamp())),
+            + str(round(datetime.now(UTC).timestamp())),
             PRIMARY_ENDPOINTS["forecast24hr"],
         )
 
@@ -263,7 +263,7 @@ class Forecast4day(NeaData):
         NeaData.__init__(
             self,
             SECONDARY_ENDPOINTS["forecast4day"]
-            + str(round(datetime.utcnow().timestamp())),
+            + str(round(datetime.now(UTC).timestamp())),
             PRIMARY_ENDPOINTS["forecast4day"],
         )
 
