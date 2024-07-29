@@ -101,10 +101,7 @@ CODE_DESCRIPTION_MAP = {
     "WS": "Windy, Showers",
 }
 
-_latest_timestamp = str(int(str(round(datetime.now().timestamp()))[:-2])//3*3)+"00" # API endpoint only accepts time rounded to nearest 5min
-NEA_HEADERS = {
-  "referer": "https://www.nea.gov.sg/"
-}
+NEA_HEADERS = {"referer": "https://www.nea.gov.sg/"}
 
 WEATHERSG_HEADERS = {
     "authority": "www.weather.gov.sg",
@@ -113,12 +110,9 @@ WEATHERSG_HEADERS = {
 }
 
 GET_ENDPOINTS = {
-    "4day": "https://www.nea.gov.sg/api/Weather4DayOutlook/GetData/"
-    + _latest_timestamp,
-    "24hr": "https://www.nea.gov.sg/api/WeatherForecast/forecast24hrnowcast2hrs/"
-    + _latest_timestamp,
-    "current": "https://www.nea.gov.sg/api/Weather24hrs/GetData/"
-    + _latest_timestamp,
+    "4day": "https://www.nea.gov.sg/api/Weather4DayOutlook/GetData/",
+    "24hr": "https://www.nea.gov.sg/api/WeatherForecast/forecast24hrnowcast2hrs/",
+    "current": "https://www.nea.gov.sg/api/Weather24hrs/GetData/",
     "temperature": "https://www.weather.gov.sg/weather-currentobservations-temperature/",
     "humidity": "https://www.weather.gov.sg/weather-currentobservations-relative-humidity/",
     "wind": "https://www.weather.gov.sg/weather-currentobservations-wind/",
@@ -157,10 +151,12 @@ WIND_DIR_TO_DEG_MAP = {
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class Weather:
     """
     Main class to easily access weather objects
     """
+
     def __init__(self) -> None:
         self.data = self.WeatherData()
         self.stations = self.Stations(self.data)
@@ -174,18 +170,28 @@ class Weather:
         """
         Class to hold raw responses from endpoints
         """
+
         def __init__(self) -> None:
             # get data from NEA API
             self.raw_resp = {}
             for k, v in GET_ENDPOINTS.items():
                 _LOGGER.debug(f"Getting {k}: {v}")
+                _latest_timestamp = (
+                    str(int(str(round(datetime.now().timestamp()))[:-2]) // 3 * 3)
+                    + "00"
+                )  # API endpoint only accepts time rounded to nearest 5min
+                _LOGGER.debug(f"Latest Timestamp {k}: {_latest_timestamp}")
                 self.raw_resp[k] = {}
-                if GET_ENDPOINTS[k][:23] == "https://www.nea.gov.sg/" :
-                    self.raw_resp[k]["raw"] = requests.get(GET_ENDPOINTS[k],headers=NEA_HEADERS)
+                if GET_ENDPOINTS[k][:23] == "https://www.nea.gov.sg/":
+                    self.raw_resp[k]["raw"] = requests.get(
+                        GET_ENDPOINTS[k] + _latest_timestamp, headers=NEA_HEADERS
+                    )
                     self.raw_resp[k]["processed"] = self.raw_resp[k]["raw"].json()
                     # print(k + ": json stored")
-                else: # scrape data from weather.sg
-                    self.raw_resp[k]["raw"] = requests.get(GET_ENDPOINTS[k],headers=WEATHERSG_HEADERS)
+                else:  # scrape data from weather.sg
+                    self.raw_resp[k]["raw"] = requests.get(
+                        GET_ENDPOINTS[k], headers=WEATHERSG_HEADERS
+                    )
                     self.raw_resp[k]["processed"] = {}
                     soup = BeautifulSoup(self.raw_resp[k]["raw"].content, "html.parser")
                     self.raw_resp[k]["obs_datetime"] = soup.find(class_="date-obs").text
@@ -197,7 +203,6 @@ class Weather:
                         raw_stations_metadata = self.raw_resp[k]["raw"].text.split(
                             '{stationCode:"'
                         )[1:]
-
 
                     else:
                         raw_stations_metadata = self.raw_resp[k]["raw"].text.split(
@@ -225,9 +230,9 @@ class Weather:
                     stations_reading = soup.find_all(class_="sgr")
                     for station_reading in stations_reading:
                         self.raw_resp[k]["processed"][station_reading["id"]] = {}
-                        self.raw_resp[k]["processed"][station_reading["id"]][
-                            "id"
-                        ] = station_reading["id"]
+                        self.raw_resp[k]["processed"][station_reading["id"]]["id"] = (
+                            station_reading["id"]
+                        )
                         self.raw_resp[k]["processed"][station_reading["id"]][
                             "station_name"
                         ] = BeautifulSoup(
@@ -236,12 +241,12 @@ class Weather:
                         self.raw_resp[k]["processed"][station_reading["id"]][
                             "value"
                         ] = station_reading.text
-                        self.raw_resp[k]["processed"][station_reading["id"]][
-                            "lat"
-                        ] = stations_metadata[station_reading["id"]]["lat"]
-                        self.raw_resp[k]["processed"][station_reading["id"]][
-                            "lon"
-                        ] = stations_metadata[station_reading["id"]]["lon"]
+                        self.raw_resp[k]["processed"][station_reading["id"]]["lat"] = (
+                            stations_metadata[station_reading["id"]]["lat"]
+                        )
+                        self.raw_resp[k]["processed"][station_reading["id"]]["lon"] = (
+                            stations_metadata[station_reading["id"]]["lon"]
+                        )
 
                         if k == "wind":
                             self.raw_resp[k]["processed"][station_reading["id"]][
