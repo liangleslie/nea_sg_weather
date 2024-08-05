@@ -1,4 +1,5 @@
 """The NEA Singapore Weather API wrapper."""
+
 from __future__ import annotations
 from ast import Str
 import math
@@ -150,8 +151,8 @@ class Forecast2hr(NeaData):
             self._resp["items"][0]["forecasts"][i]["area"]: {
                 "forecast": self._resp["items"][0]["forecasts"][i]["forecast"],
                 "location": {
-                    "latitude": self.metadata[i]["label_location"]["latitude"],
-                    "longitude": self.metadata[i]["label_location"]["longitude"],
+                    "latitude": float(self.metadata[i]["label_location"]["latitude"]),
+                    "longitude": float(self.metadata[i]["label_location"]["longitude"]),
                 },
             }
             for i in range(len(self._resp["items"][0]["forecasts"]))
