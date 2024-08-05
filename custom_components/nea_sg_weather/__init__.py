@@ -1,4 +1,5 @@
 """The NEA Singapore Weather component."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -72,7 +73,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
 
     _platforms = get_platforms(config_entry)["platforms"]
-    hass.async_add_job(
+    hass.async_create_task(
         hass.config_entries.async_forward_entry_setups(config_entry, _platforms)
     )
 
