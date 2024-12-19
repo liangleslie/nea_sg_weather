@@ -28,6 +28,7 @@ from .nea import (
     Humidity,
     Wind,
     Rain,
+    UVIndex
 )
 
 from .const import (
@@ -147,6 +148,7 @@ class NeaWeatherData:
                 self.data.humidity,
                 self.data.wind,
                 self.data.rain,
+                self.data.uvindex
             ]
         else:
             if self._config_entry.data[CONF_SENSORS].get(CONF_AREAS, ["None"]) != [
@@ -174,6 +176,7 @@ class NeaWeatherData:
             self.forecast4day = Forecast4day()
             self.temperature = Temperature()
             self.humidity = Humidity()
+            self.uvindex = UVIndex()
             self.wind = Wind()
             self.rain = Rain()
             self.query_time = datetime.now(timezone(timedelta(hours=8))).isoformat()
