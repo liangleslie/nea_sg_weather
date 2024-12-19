@@ -406,6 +406,30 @@ class WindDirection(NeaData):
         _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
         return
 
+class UVIndex(NeaData):
+    """Class for _uvindex_ data"""
+
+    def __init__(self):
+        self.timestamp = ""
+        self.uv_index = 0
+        NeaData.__init__(
+            self,
+            PRIMARY_ENDPOINTS["uv-index"],
+            SECONDARY_ENDPOINTS["uv-index"],
+        )
+
+    def process_data(self):
+        # Update data timestamp
+        self.timestamp = self._resp["data"]["records"][0]["timestamp"]
+
+        self.uv_index = self._resp["data"]["records"][0]["index"][0]["value"]
+
+        _LOGGER.debug("%s: Data processed", self.__class__.__name__)
+        return
+
+    def process_secondary_data(self):
+        _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
+        return
 
 class WindSpeed(NeaData):
     """Class for _wind-speed_ data"""
