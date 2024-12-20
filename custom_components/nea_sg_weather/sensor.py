@@ -249,8 +249,8 @@ class NeaPM25Sensor(CoordinatorEntity, SensorEntity):
         )
 
     @property
-    def entity_picture(self):
-        """Return the entity picture url from NEA to use in the frontend"""
+    def icon(self):
+        """Return the icon to use in the frontend"""
         return "mdi:air-filter"
 
     @property
@@ -397,8 +397,8 @@ class NeaUVSensor(CoordinatorEntity, SensorEntity):
         )
 
     @property
-    def entity_picture(self):
-        """Return the entity picture url from NEA to use in the frontend"""
+    def icon(self):
+        """Return the icon to use in the frontend"""
         return "mdi:weather-sunny"
 
     @property
