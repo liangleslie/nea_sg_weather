@@ -291,3 +291,61 @@ class NeaRainSensor(CoordinatorEntity, SensorEntity):
             manufacturer="NEA Weather",
             model="data.gov.sg API Polling",
         )
+
+class NeaUVSensor(CoordinatorEntity, SensorEntity):
+    """Implementation of a NEA UV sensor in Singapore."""
+
+    def __init__(
+        self,
+        coordinator,
+        config: MappingProxyType[str, Any],
+    ) -> None:
+        """Initialise area sensor with a data instance and site."""
+        super().__init__(coordinator)
+        self.coordinator = coordinator
+        self._platform = "sensor"
+        self._prefix = config[CONF_SENSORS][CONF_PREFIX]
+        self.entity_id = (
+            (self._platform + "." + self._prefix + "_uv")
+            .lower()
+            .replace(" ", "_")
+        )
+
+    @property
+    def unique_id(self):
+        """Return the unique ID."""
+        return self._prefix + "_uv"
+
+    @property
+    def name(self):
+        """Return the friendly name of the sensor."""
+        return (
+            ("UV Index in Singapore")
+        )
+
+    @property
+    def entity_picture(self):
+        """Return the entity picture url from NEA to use in the frontend"""
+        return "mdi:weather-sunny"
+
+    @property
+    def state(self):
+        """Return the weather condition."""
+        return self.coordinator.data.uvindex.uv_index
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return dict of additional properties to attach to sensors."""
+        return {
+            "Updated at": self.coordinator.data.forecast24hr.timestamp,
+        }
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Device info."""
+        return DeviceInfo(
+            name="Weather forecast coordinator",
+            identifiers={(DOMAIN,)},  # type: ignore[arg-type]
+            manufacturer="NEA Weather",
+            model="data.gov.sg API Polling",
+        )
