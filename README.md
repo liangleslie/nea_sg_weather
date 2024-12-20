@@ -1,8 +1,9 @@
 # NEA Singapore Weather Integration for Home Assistant
 
+Since the original author has archived the component. I decided to try to add some features and maintain it
 Forked from https://github.com/liangleslie/nea_sg_weather
 
-Home Assistant Integration to get current weather information directly from Data.gov.sg weather API published by Singapore National Enviroment Agency (SG NEA)
+Home Assistant Integration to get current weather information directly from Data.gov.sg weather API published by Singapore National Environment Agency (SG NEA)
 
 ![image](https://user-images.githubusercontent.com/57534857/142906976-9f28571f-290f-42e1-85a0-68ee23f917d8.png)
 
@@ -16,7 +17,9 @@ Follow the integration config flow to set up the following entities:
 - `weather`: weather entity with 4 day forecasts
 - `area` (town) sensors: current weather conditions for up to 47 areas/towns in Singapore 
 - `region` sensors: 24 weather condition forecast for North/South/East/West/Central regions of Singapore
-- `rain` camera: 2 camera entities for static and animated rain map overlays that are updated every 5 minutes from NEA
+- `rain` camera: 2 camera entities for static and animated rain map overlays that are updated every 5 minutes from NEA\
+- `uv_index` sensors: 5 pm2.5 sensors for North/South/East/West/Central regions of Singapore
+- `uv_index` sensor: 1 uv index for Singapore
 
 
 ## Weather Map Overlays
