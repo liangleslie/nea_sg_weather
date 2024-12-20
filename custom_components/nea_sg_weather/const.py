@@ -601,6 +601,7 @@ PRIMARY_ENDPOINTS = {
     "forecast4day": "https://api.data.gov.sg/v1/environment/4-day-weather-forecast",
     "rainfall": "https://api.data.gov.sg/v1/environment/rainfall",
     "uv-index": "https://api-open.data.gov.sg/v2/real-time/api/uv",
+    "pm25": "https://api-open.data.gov.sg/v2/real-time/api/pm25",
 }
 
 SECONDARY_ENDPOINTS = {
@@ -613,4 +614,5 @@ SECONDARY_ENDPOINTS = {
     "forecast4day": "https://www.nea.gov.sg/api/Weather4DayOutlook/GetData/",
     "rainfall": "",
     "uv-index": "",
+    "pm25": "",
 }

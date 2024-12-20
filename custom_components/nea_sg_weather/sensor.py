@@ -67,6 +67,13 @@ async def async_setup_entry(
         NeaUVSensor(coordinator, config_entry.data)
     ]
 
+    # add region sensor entities
+    if config_entry.data[CONF_SENSORS][CONF_REGION]:
+        entities_list += [
+            NeaPM25Sensor(coordinator, config_entry.data, region)
+            for region in REGIONS
+        ]
+
     async_add_entities(entities_list)
 
 
@@ -206,6 +213,67 @@ class NeaRegionSensor(CoordinatorEntity, SensorEntity):
             model="data.gov.sg API Polling",
         )
 
+class NeaPM25Sensor(CoordinatorEntity, SensorEntity):
+    """Implementation of a NEA pm25 sensor for a region in Singapore."""
+
+    def __init__(
+        self,
+        coordinator,
+        config: MappingProxyType[str, Any],
+        region: str,
+    ) -> None:
+        """Initialise area sensor with a data instance and site."""
+        super().__init__(coordinator)
+        self.coordinator = coordinator
+        self._platform = "sensor"
+        self._prefix = config[CONF_SENSORS][CONF_PREFIX]
+        self._region = region
+        self.entity_id = (
+            (self._platform + "." + self._prefix + "_pm25" + self._region)
+            .lower()
+            .replace(" ", "_")
+        )
+
+    @property
+    def unique_id(self):
+        """Return the unique ID."""
+        return self._prefix + " pm25 " + self._region
+
+    @property
+    def name(self):
+        """Return the friendly name of the sensor."""
+        return (
+            ("PM 2.5 Readings in " + self._region + "ern Singapore")
+            if self._region != "central"
+            else ("PM 2.5 Readings in " + self._region + " Singapore")
+        )
+
+    @property
+    def entity_picture(self):
+        """Return the entity picture url from NEA to use in the frontend"""
+        return ""
+
+    @property
+    def state(self):
+        """Return the weather condition."""
+        return self.coordinator.data.pm25[self._region.lower()]
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return dict of additional properties to attach to sensors."""
+        return {
+            "Updated at": self.coordinator.data.forecast24hr.timestamp,
+        }
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Device info."""
+        return DeviceInfo(
+            name="Weather forecast coordinator",
+            identifiers={(DOMAIN,)},  # type: ignore[arg-type]
+            manufacturer="NEA Weather",
+            model="data.gov.sg API Polling",
+        )
 
 class NeaRainSensor(CoordinatorEntity, SensorEntity):
     """Implementation of a NEA Weather sensor for a rainfall sensor in Singapore."""
