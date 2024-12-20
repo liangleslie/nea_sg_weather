@@ -420,10 +420,10 @@ class PM25(NeaData):
 
     def process_data(self):
         # Update data timestamp
-        self.timestamp = self._resp["items"][0]["timestamp"]
+        self.timestamp = self._resp["data"]["items"][0]["timestamp"]
 
         # Store wind direction data
-        self.data = self._resp["items"][0]["readings"]["pm25_one_hourly"]
+        self.data = self._resp["data"]["items"][0]["readings"]["pm25_one_hourly"]
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
