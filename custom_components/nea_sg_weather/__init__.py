@@ -29,7 +29,7 @@ from .nea import (
     Wind,
     Rain,
     UVIndex,
-    PM25
+    #PM25
 )
 
 from .const import (
@@ -181,5 +181,5 @@ class NeaWeatherData:
             self.uvindex = UVIndex()
             self.wind = Wind()
             self.rain = Rain()
-            self.pm25 = PM25()
+            #self.pm25 = PM25()
             self.query_time = datetime.now(timezone(timedelta(hours=8))).isoformat()
