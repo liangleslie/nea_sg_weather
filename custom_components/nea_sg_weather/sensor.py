@@ -61,6 +61,11 @@ async def async_setup_entry(
             NeaRainSensor(coordinator, config_entry.data, rain_sensor_id["id"])
             for rain_sensor_id in coordinator.data.rain.station_list
         ]
+    
+    # add uv sensor entities
+    entities_list += [
+        NeaUVSensor(coordinator, config_entry.data)
+    ]
 
     async_add_entities(entities_list)
 
