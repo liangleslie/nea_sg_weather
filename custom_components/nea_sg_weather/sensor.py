@@ -244,7 +244,7 @@ class NeaPM25Sensor(CoordinatorEntity, SensorEntity):
         """Return the friendly name of the sensor."""
         return (
             ("PM 2.5 Readings in " + self._region + "ern Singapore")
-            if self._region != "central"
+            if self._region != "Central"
             else ("PM 2.5 Readings in " + self._region + " Singapore")
         )
 
@@ -256,7 +256,7 @@ class NeaPM25Sensor(CoordinatorEntity, SensorEntity):
     @property
     def state(self):
         """Return the weather condition."""
-        return self.coordinator.data.pm25[self._region.lower()]
+        return self.coordinator.data.pm25.data[self._region.lower()]
 
     @property
     def extra_state_attributes(self) -> dict:
