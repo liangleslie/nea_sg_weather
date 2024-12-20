@@ -251,7 +251,7 @@ class NeaPM25Sensor(CoordinatorEntity, SensorEntity):
     @property
     def entity_picture(self):
         """Return the entity picture url from NEA to use in the frontend"""
-        return ""
+        return "mdi:air-filter"
 
     @property
     def state(self):
