@@ -63,16 +63,16 @@ async def async_setup_entry(
         ]
     
     # add uv sensor entities
-    entities_list += [
-        NeaUVSensor(coordinator, config_entry.data)
-    ]
+    # entities_list += [
+    #     NeaUVSensor(coordinator, config_entry.data)
+    # ]
 
-    # add region sensor entities
-    if config_entry.data[CONF_SENSORS][CONF_REGION]:
-        entities_list += [
-            NeaPM25Sensor(coordinator, config_entry.data, region)
-            for region in REGIONS
-        ]
+    # add pm25 sensor entities
+    # if config_entry.data[CONF_SENSORS][CONF_REGION]:
+    #     entities_list += [
+    #         NeaPM25Sensor(coordinator, config_entry.data, region)
+    #         for region in REGIONS
+    #     ]
 
     async_add_entities(entities_list)
 
