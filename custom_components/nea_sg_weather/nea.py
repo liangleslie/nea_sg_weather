@@ -422,7 +422,7 @@ class PM25(NeaData):
         # Update data timestamp
         self.timestamp = self._resp["data"]["items"][0]["timestamp"]
 
-        # Store wind direction data
+        # Store pm25 data
         self.data = self._resp["data"]["items"][0]["readings"]["pm25_one_hourly"]
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
