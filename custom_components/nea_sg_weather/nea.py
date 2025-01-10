@@ -239,7 +239,7 @@ class Forecast24hr(NeaData):
         for region in self._resp["data"]["records"][0]["periods"][0]["regions"].keys():
             self.region_forecast[region] = list()
             for period in self._resp["data"]["records"][0]["periods"]:
-                _time = datetime.fromisoformat(period["time"]["start"])
+                _time = datetime.fromisoformat(period["timePeriod"]["start"])
                 _now = datetime.now(timezone(timedelta(hours=8)))
                 _day = "Today " if _time.date() == _now.date() else "Tomorrow "
                 _time_of_day = (
@@ -249,7 +249,7 @@ class Forecast24hr(NeaData):
                     if _time.hour == 12
                     else "evening"
                 )
-                _condition = period["regions"][region]
+                _condition = period["regions"][region]["text"]
                 self.region_forecast[region] += [[_day + _time_of_day, _condition]]
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
@@ -293,7 +293,7 @@ class Forecast4day(NeaData):
         self.forecast = list()
         for entry in self._resp["data"]["records"][0]["forecasts"]:
             for forecast_condition, condition in FORECAST_MAP_CONDITION.items():
-                if forecast_condition in entry["forecast"].lower():
+                if forecast_condition in entry["forecast"]["text"].lower():
                     self.forecast.append(
                         {
                             ATTR_FORECAST_TIME: entry["timestamp"],
