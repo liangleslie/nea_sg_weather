@@ -5,6 +5,7 @@ from ast import Str
 import math
 from datetime import datetime, timedelta, timezone, UTC
 import logging
+import statistics
 
 import aiohttp
 
@@ -325,7 +326,7 @@ class Temperature(NeaData):
         # Update data timestamp
         self.timestamp = self._resp["data"]["readings"][0]["timestamp"]
 
-        self.temp_avg = list_mean([x["value"] for x in self._resp["data"]["readings"][0]["data"]])
+        self.temp_avg = statistics.fmean([x["value"] for x in self._resp["data"]["readings"][0]["data"]])
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
@@ -352,7 +353,7 @@ class Humidity(NeaData):
         self.timestamp = self._resp["data"]["readings"][0]["timestamp"]
 
         try:
-            self.humd_avg = list_mean([x["value"] for x in self._resp["data"]["readings"][0]["data"]])
+            self.humd_avg = statistics.fmean([x["value"] for x in self._resp["data"]["readings"][0]["data"]])
         except:
             self.humd_avg = 0
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
