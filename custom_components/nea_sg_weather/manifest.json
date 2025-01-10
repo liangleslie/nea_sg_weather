@@ -4,5 +4,5 @@
   "config_flow": true,
   "codeowners": ["@kianhean"],
   "iot_class": "cloud_polling",
-  "version": "2.5.3"
+  "version": "2.5.4"
 }

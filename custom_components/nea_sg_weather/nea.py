@@ -380,7 +380,7 @@ class WindDirection(NeaData):
         self.timestamp = self._resp["data"]["readings"][0]["timestamp"]
 
         # Store wind direction data
-        self.data = self._resp["data"]["readings"][0]["data"][0]["value"]
+        self.data = self._resp["data"]["readings"][0]["data"]
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
@@ -457,7 +457,7 @@ class WindSpeed(NeaData):
         self.timestamp = self._resp["data"]["readings"][0]["timestamp"]
 
         # Store wind speed data
-        self.data = self._resp["data"]["readings"][0]["data"][0]["value"]
+        self.data = self._resp["data"]["readings"][0]["data"]
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
@@ -507,8 +507,8 @@ class Wind:
         for wind_speed_reading in wind_speed:
             for wind_direction_reading in wind_direction:
                 if (
-                    wind_speed_reading["station_id"]
-                    == wind_direction_reading["station_id"]
+                    wind_speed_reading["stationId"]
+                    == wind_direction_reading["stationId"]
                 ):
                     result["ns_sum"] += wind_speed_reading["value"] * math.cos(
                         math.radians(wind_direction_reading["value"] + 180)
