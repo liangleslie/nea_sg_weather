@@ -1,4 +1,4 @@
-v2.5.1
+v2.5.3
 
 - migrate all v1 api data to v2
 
