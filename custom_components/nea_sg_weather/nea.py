@@ -5,6 +5,7 @@ from ast import Str
 import math
 from datetime import datetime, timedelta, timezone, UTC
 import logging
+import statistics
 
 import aiohttp
 
@@ -134,12 +135,12 @@ class Forecast2hr(NeaData):
 
     def process_data(self):
         # Update data timestamp
-        self.timestamp = self._resp["items"][0]["timestamp"]
-        self.metadata = self._resp["area_metadata"]
+        self.timestamp = self._resp["data"]["items"][0]["timestamp"]
+        self.metadata = self._resp["data"]["area_metadata"]
 
         # Get most common weather condition across Singapore areas
         _current_condition_list = [
-            item["forecast"] for item in self._resp["items"][0]["forecasts"]
+            item["forecast"] for item in self._resp["data"]["items"][0]["forecasts"]
         ]
         self.current_condition = max(
             set(_current_condition_list),
@@ -148,14 +149,14 @@ class Forecast2hr(NeaData):
 
         # Store area forecast data
         self.area_forecast = {
-            self._resp["items"][0]["forecasts"][i]["area"]: {
-                "forecast": self._resp["items"][0]["forecasts"][i]["forecast"],
+            self._resp["data"]["items"][0]["forecasts"][i]["area"]: {
+                "forecast": self._resp["data"]["items"][0]["forecasts"][i]["forecast"],
                 "location": {
                     "latitude": float(self.metadata[i]["label_location"]["latitude"]),
                     "longitude": float(self.metadata[i]["label_location"]["longitude"]),
                 },
             }
-            for i in range(len(self._resp["items"][0]["forecasts"]))
+            for i in range(len(self._resp["data"]["items"][0]["forecasts"]))
         }
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
@@ -202,9 +203,9 @@ class Forecast24hr(NeaData):
         self.region_forecast = dict()
         NeaData.__init__(
             self,
+            PRIMARY_ENDPOINTS["forecast24hr"],
             SECONDARY_ENDPOINTS["forecast24hr"]
             + str(round(datetime.now(UTC).timestamp())),
-            PRIMARY_ENDPOINTS["forecast24hr"],
         )
 
     def process_secondary_data(self):
@@ -232,27 +233,27 @@ class Forecast24hr(NeaData):
         return
 
     def process_data(self):
-        _LOGGER.debug("process 24 hour data")
         # Update data timestamp
-        _tmp_forecast_datetime = datetime.strptime(
-            self._resp["Channel2HrForecast"]["Item"]["ForecastIssue"]["DateTimeStr"]
-            + " 2022",
-            "%I.%M%p %d %b %Y",
-        ).replace(tzinfo=timezone(timedelta(hours=8)))
-        self.timestamp = _tmp_forecast_datetime.isoformat()
+        self.timestamp = self._resp["data"]["records"][0]["timestamp"]
 
         # Create region forecast
-        for region in ["east", "west", "north", "south", "central"]:
-            self.region_forecast[region] = [
-                [
-                    self._resp["Channel24HrForecast"]["Forecasts"][i]["TimePeriod"],
-                    INV_FORECAST_ICON_MAP_CONDITION[
-                        self._resp["Channel24HrForecast"]["Forecasts"][i]["Wx" + region]
-                    ],
-                ]
-                for i in range(3)
-            ]
-        _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
+        for region in self._resp["data"]["records"][0]["periods"][0]["regions"].keys():
+            self.region_forecast[region] = list()
+            for period in self._resp["data"]["records"][0]["periods"]:
+                _time = datetime.fromisoformat(period["timePeriod"]["start"])
+                _now = datetime.now(timezone(timedelta(hours=8)))
+                _day = "Today " if _time.date() == _now.date() else "Tomorrow "
+                _time_of_day = (
+                    "morning"
+                    if _time.hour == 6
+                    else "afternoon"
+                    if _time.hour == 12
+                    else "evening"
+                )
+                _condition = period["regions"][region]["text"]
+                self.region_forecast[region] += [[_day + _time_of_day, _condition]]
+
+        _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
 
@@ -263,9 +264,9 @@ class Forecast4day(NeaData):
         self.forecast = list()
         NeaData.__init__(
             self,
+            PRIMARY_ENDPOINTS["forecast4day"],
             SECONDARY_ENDPOINTS["forecast4day"]
             + str(round(datetime.now(UTC).timestamp())),
-            PRIMARY_ENDPOINTS["forecast4day"],
         )
 
     def process_secondary_data(self):
@@ -289,40 +290,23 @@ class Forecast4day(NeaData):
         return
 
     def process_data(self):
-        _LOGGER.debug("process 4 day data")
         # Create 4-day forecast
         self.forecast = list()
-        _today = datetime.now(timezone(timedelta(hours=8))).replace(microsecond=0)
-        _date_map = dict()
-        for i in range(5):
-            _date = _today + timedelta(days=i)
-            _date_map[_date.strftime("%a").upper()] = _date.replace(
-                microsecond=0
-            ).isoformat()
-
-        for entry in self._resp:
+        for entry in self._resp["data"]["records"][0]["forecasts"]:
             for forecast_condition, condition in FORECAST_MAP_CONDITION.items():
-                if forecast_condition in entry["forecast"].lower():
+                if forecast_condition in entry["forecast"]["text"].lower():
                     self.forecast.append(
                         {
-                            ATTR_FORECAST_TIME: _date_map[entry["day"]],
-                            ATTR_FORECAST_NATIVE_TEMP: float(
-                                entry["temperature"][-4:-2]
-                            ),
-                            ATTR_FORECAST_NATIVE_TEMP_LOW: float(
-                                entry["temperature"][:2]
-                            ),
-                            ATTR_FORECAST_NATIVE_WIND_SPEED: int(
-                                entry["wind_speed"][-6:-4]
-                            ),
-                            ATTR_FORECAST_WIND_BEARING: entry["wind_speed"].split(" ")[
-                                0
-                            ],
+                            ATTR_FORECAST_TIME: entry["timestamp"],
+                            ATTR_FORECAST_TEMP: entry["temperature"]["high"],
+                            ATTR_FORECAST_TEMP_LOW: entry["temperature"]["low"],
+                            ATTR_FORECAST_WIND_SPEED: (entry["wind"]["speed"]["high"] + entry["wind"]["speed"]["low"])/2,
+                            ATTR_FORECAST_WIND_BEARING: entry["wind"]["direction"],
                             ATTR_FORECAST_CONDITION: condition,
                         }
                     )
                     break
-        _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
+        _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
 
@@ -340,9 +324,9 @@ class Temperature(NeaData):
 
     def process_data(self):
         # Update data timestamp
-        self.timestamp = self._resp["items"][0]["timestamp"]
+        self.timestamp = self._resp["data"]["readings"][0]["timestamp"]
 
-        self.temp_avg = list_mean(self._resp["items"][0]["readings"])
+        self.temp_avg = statistics.fmean([x["value"] for x in self._resp["data"]["readings"][0]["data"]])
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
@@ -366,10 +350,10 @@ class Humidity(NeaData):
 
     def process_data(self):
         # Update data timestamp
-        self.timestamp = self._resp["items"][0]["timestamp"]
+        self.timestamp = self._resp["data"]["readings"][0]["timestamp"]
 
         try:
-            self.humd_avg = list_mean(self._resp["items"][0]["readings"])
+            self.humd_avg = statistics.fmean([x["value"] for x in self._resp["data"]["readings"][0]["data"]])
         except:
             self.humd_avg = 0
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
@@ -394,10 +378,10 @@ class WindDirection(NeaData):
 
     def process_data(self):
         # Update data timestamp
-        self.timestamp = self._resp["items"][0]["timestamp"]
+        self.timestamp = self._resp["data"]["readings"][0]["timestamp"]
 
         # Store wind direction data
-        self.data = self._resp["items"][0]["readings"]
+        self.data = self._resp["data"]["readings"][0]["data"]
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
@@ -406,6 +390,56 @@ class WindDirection(NeaData):
         _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
         return
 
+class PM25(NeaData):
+    """Class for _pm2.5_ data"""
+
+    def __init__(self):
+        self.timestamp = ""
+        self.data = dict()
+        NeaData.__init__(
+            self,
+            PRIMARY_ENDPOINTS["pm25"],
+            SECONDARY_ENDPOINTS["pm25"],
+        )
+
+    def process_data(self):
+        # Update data timestamp
+        self.timestamp = self._resp["data"]["items"][0]["timestamp"]
+
+        # Store pm25 data
+        self.data = self._resp["data"]["items"][0]["readings"]["pm25_one_hourly"]
+
+        _LOGGER.debug("%s: Data processed", self.__class__.__name__)
+        return
+
+    def process_secondary_data(self):
+        _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
+        return
+
+class UVIndex(NeaData):
+    """Class for _uvindex_ data"""
+
+    def __init__(self):
+        self.timestamp = ""
+        self.uv_index = 0
+        NeaData.__init__(
+            self,
+            PRIMARY_ENDPOINTS["uv-index"],
+            SECONDARY_ENDPOINTS["uv-index"],
+        )
+
+    def process_data(self):
+        # Update data timestamp
+        self.timestamp = self._resp["data"]["records"][0]["timestamp"]
+
+        self.uv_index = self._resp["data"]["records"][0]["index"][0]["value"]
+
+        _LOGGER.debug("%s: Data processed", self.__class__.__name__)
+        return
+
+    def process_secondary_data(self):
+        _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
+        return
 
 class WindSpeed(NeaData):
     """Class for _wind-speed_ data"""
@@ -421,10 +455,10 @@ class WindSpeed(NeaData):
 
     def process_data(self):
         # Update data timestamp
-        self.timestamp = self._resp["items"][0]["timestamp"]
+        self.timestamp = self._resp["data"]["readings"][0]["timestamp"]
 
         # Store wind speed data
-        self.data = self._resp["items"][0]["readings"]
+        self.data = self._resp["data"]["readings"][0]["data"]
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
@@ -474,8 +508,8 @@ class Wind:
         for wind_speed_reading in wind_speed:
             for wind_direction_reading in wind_direction:
                 if (
-                    wind_speed_reading["station_id"]
-                    == wind_direction_reading["station_id"]
+                    wind_speed_reading["stationId"]
+                    == wind_direction_reading["stationId"]
                 ):
                     result["ns_sum"] += wind_speed_reading["value"] * math.cos(
                         math.radians(wind_direction_reading["value"] + 180)
@@ -513,13 +547,13 @@ class Rain(NeaData):
 
     def process_data(self):
         # Update data timestamp
-        self.timestamp = self._resp["items"][0]["timestamp"]
+        self.timestamp = self._resp["data"]["readings"][0]["timestamp"]
 
         # Store rainfall data
-        resp_data = self._resp["items"][0]["readings"]
+        resp_data = self._resp["data"]["readings"][0]["data"]
 
         self.station_list = RAIN_SENSOR_LIST
-        _current_station_list = [reading["station_id"] for reading in resp_data]
+        _current_station_list = [reading["stationId"] for reading in resp_data]
 
         self.data = dict()
 

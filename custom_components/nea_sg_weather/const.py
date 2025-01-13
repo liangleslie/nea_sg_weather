@@ -592,14 +592,16 @@ RAIN_SENSOR_LIST = [
 REGIONS = ["West", "East", "Central", "South", "North"]
 
 PRIMARY_ENDPOINTS = {
-    "forecast2hr": "https://api.data.gov.sg/v1/environment/2-hour-weather-forecast",
-    "forecast24hr": "https://api.data.gov.sg/v1/environment/24-hour-weather-forecast",
-    "temperature": "https://api.data.gov.sg/v1/environment/air-temperature",
-    "humidity": "https://api.data.gov.sg/v1/environment/relative-humidity",
-    "wind-direction": "https://api.data.gov.sg/v1/environment/wind-direction",
-    "wind-speed": "https://api.data.gov.sg/v1/environment/wind-speed",
-    "forecast4day": "https://api.data.gov.sg/v1/environment/4-day-weather-forecast",
-    "rainfall": "https://api.data.gov.sg/v1/environment/rainfall",
+    "forecast2hr": "https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast",
+    "forecast24hr": "https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast",
+    "temperature": "https://api-open.data.gov.sg/v2/real-time/api/air-temperature",
+    "humidity": "https://api-open.data.gov.sg/v2/real-time/api/relative-humidity",
+    "wind-direction": "https://api-open.data.gov.sg/v2/real-time/api/wind-direction",
+    "wind-speed": "https://api-open.data.gov.sg/v2/real-time/api/wind-speed",
+    "forecast4day": "https://api-open.data.gov.sg/v2/real-time/api/four-day-outlook",
+    "rainfall": "https://api-open.data.gov.sg/v2/real-time/api/rainfall",
+    "uv-index": "https://api-open.data.gov.sg/v2/real-time/api/uv",
+    "pm25": "https://api-open.data.gov.sg/v2/real-time/api/pm25",
 }
 
 SECONDARY_ENDPOINTS = {
@@ -611,4 +613,6 @@ SECONDARY_ENDPOINTS = {
     "wind-speed": "",
     "forecast4day": "https://www.nea.gov.sg/api/Weather4DayOutlook/GetData/",
     "rainfall": "",
+    "uv-index": "",
+    "pm25": "",
 }

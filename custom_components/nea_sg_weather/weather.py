@@ -108,6 +108,11 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
         return round(self.coordinator.data.temperature.temp_avg, 2)
 
     @property
+    def uv_index(self):
+        """Return the current uv index."""
+        return self.coordinator.data.uvindex.uv_index
+
+    @property
     def humidity(self):
         """Return the humidity."""
         return round(self.coordinator.data.humidity.humd_avg, 2)
