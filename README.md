@@ -1,7 +1,6 @@
 # NEA Singapore Weather Integration for Home Assistant
 
-Since the original author has archived the component. I decided to try to add some features and maintain it
-Forked from https://github.com/liangleslie/nea_sg_weather
+[CHANGELOG](CHANGELOG.md)
 
 Home Assistant Integration to get current weather information directly from Data.gov.sg weather API published by Singapore National Environment Agency (SG NEA)
 
