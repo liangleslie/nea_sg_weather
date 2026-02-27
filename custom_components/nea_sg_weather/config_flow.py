@@ -6,6 +6,7 @@ import logging
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import (
     CONF_NAME,
     CONF_PREFIX,
@@ -16,7 +17,6 @@ from homeassistant.const import (
     CONF_TIMEOUT,
 )
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 import homeassistant.helpers.config_validation as cv
 
 from .const import (
@@ -45,6 +45,8 @@ def configured_instances(hass):
 
 class NeaWeatherFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """Config flow for NEA SG Weather component."""
+
+    VERSION = 1
 
     def __init__(self):
         """Init NeaWeatherFlowHandler."""
@@ -120,7 +122,7 @@ class NeaWeatherFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             errors=self._errors,
         )
 
-    async def async_step_import(self, user_input: dict | None = None) -> FlowResult:
+    async def async_step_import(self, user_input: dict | None = None) -> ConfigFlowResult:
         """Handle configuration by yaml file."""
         return await self.async_step_user(user_input)
 

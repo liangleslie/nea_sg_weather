@@ -5,11 +5,20 @@ import logging
 from types import MappingProxyType
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PREFIX, CONF_REGION, CONF_SENSORS
+from homeassistant.const import (
+    CONF_PREFIX,
+    CONF_REGION,
+    CONF_SENSORS,
+    UnitOfPrecipitationDepth,
+)
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -36,43 +45,44 @@ async def async_setup_entry(
     coordinator: NeaWeatherDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
     ]
+    entry_id = config_entry.entry_id
 
     # add area sensor entities
     if "All" in config_entry.data[CONF_SENSORS][CONF_AREAS]:
         entities_list = [
-            NeaAreaSensor(coordinator, config_entry.data, area) for area in AREAS
+            NeaAreaSensor(coordinator, config_entry.data, area, entry_id) for area in AREAS
         ]
     else:
         entities_list = [
-            NeaAreaSensor(coordinator, config_entry.data, area)
+            NeaAreaSensor(coordinator, config_entry.data, area, entry_id)
             for area in list(set(config_entry.data[CONF_SENSORS][CONF_AREAS]))
         ]
 
     # add region sensor entities
     if config_entry.data[CONF_SENSORS][CONF_REGION]:
         entities_list += [
-            NeaRegionSensor(coordinator, config_entry.data, region)
+            NeaRegionSensor(coordinator, config_entry.data, region, entry_id)
             for region in REGIONS
         ]
 
     # add rainfall sensor entities
     if config_entry.data[CONF_SENSORS][CONF_RAIN]:
         entities_list += [
-            NeaRainSensor(coordinator, config_entry.data, rain_sensor_id["id"])
+            NeaRainSensor(coordinator, config_entry.data, rain_sensor_id["id"], entry_id)
             for rain_sensor_id in coordinator.data.rain.station_list
         ]
-    
-    #add uv sensor entities
+
+    # add uv sensor entities
     entities_list += [
-        NeaUVSensor(coordinator, config_entry.data)
+        NeaUVSensor(coordinator, config_entry.data, entry_id)
     ]
 
     # add pm25 sensor entities
     if config_entry.data[CONF_SENSORS][CONF_REGION]:
-         entities_list += [
-             NeaPM25Sensor(coordinator, config_entry.data, region)
-             for region in REGIONS
-         ]
+        entities_list += [
+            NeaPM25Sensor(coordinator, config_entry.data, region, entry_id)
+            for region in REGIONS
+        ]
 
     async_add_entities(entities_list)
 
@@ -85,6 +95,7 @@ class NeaAreaSensor(CoordinatorEntity, SensorEntity):
         coordinator,
         config: MappingProxyType[str, Any],
         area: str,
+        entry_id: str,
     ) -> None:
         """Initialise area sensor with a data instance and site."""
         super().__init__(coordinator)
@@ -92,6 +103,7 @@ class NeaAreaSensor(CoordinatorEntity, SensorEntity):
         self._platform = "sensor"
         self._prefix = config[CONF_SENSORS][CONF_PREFIX]
         self._area = area
+        self._entry_id = entry_id
         self.entity_id = (
             (self._platform + "." + self._prefix + "_" + self._area)
             .lower()
@@ -111,7 +123,7 @@ class NeaAreaSensor(CoordinatorEntity, SensorEntity):
     @property
     def entity_picture(self):
         """Return the entity picture url from NEA to use in the frontend"""
-        return FORECAST_ICON_BASE_URL + FORECAST_ICON_MAP_CONDITION[self.state] + ".png"
+        return FORECAST_ICON_BASE_URL + FORECAST_ICON_MAP_CONDITION.get(self.state, "NA") + ".png"
 
     @property
     def state(self):
@@ -136,7 +148,7 @@ class NeaAreaSensor(CoordinatorEntity, SensorEntity):
         """Device info."""
         return DeviceInfo(
             name="Weather forecast coordinator",
-            identifiers={(DOMAIN,)},  # type: ignore[arg-type]
+            identifiers={(DOMAIN, self._entry_id)},
             manufacturer="NEA Weather",
             model="data.gov.sg API Polling",
         )
@@ -150,6 +162,7 @@ class NeaRegionSensor(CoordinatorEntity, SensorEntity):
         coordinator,
         config: MappingProxyType[str, Any],
         region: str,
+        entry_id: str,
     ) -> None:
         """Initialise area sensor with a data instance and site."""
         super().__init__(coordinator)
@@ -157,6 +170,7 @@ class NeaRegionSensor(CoordinatorEntity, SensorEntity):
         self._platform = "sensor"
         self._prefix = config[CONF_SENSORS][CONF_PREFIX]
         self._region = region
+        self._entry_id = entry_id
         self.entity_id = (
             (self._platform + "." + self._prefix + "_" + self._region)
             .lower()
@@ -180,7 +194,7 @@ class NeaRegionSensor(CoordinatorEntity, SensorEntity):
     @property
     def entity_picture(self):
         """Return the entity picture url from NEA to use in the frontend"""
-        return FORECAST_ICON_BASE_URL + FORECAST_ICON_MAP_CONDITION[self.state] + ".png"
+        return FORECAST_ICON_BASE_URL + FORECAST_ICON_MAP_CONDITION.get(self.state, "NA") + ".png"
 
     @property
     def state(self):
@@ -208,19 +222,25 @@ class NeaRegionSensor(CoordinatorEntity, SensorEntity):
         """Device info."""
         return DeviceInfo(
             name="Weather forecast coordinator",
-            identifiers={(DOMAIN,)},  # type: ignore[arg-type]
+            identifiers={(DOMAIN, self._entry_id)},
             manufacturer="NEA Weather",
             model="data.gov.sg API Polling",
         )
 
+
 class NeaPM25Sensor(CoordinatorEntity, SensorEntity):
     """Implementation of a NEA pm25 sensor for a region in Singapore."""
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_device_class = SensorDeviceClass.PM25
+    _attr_native_unit_of_measurement = "µg/m³"
 
     def __init__(
         self,
         coordinator,
         config: MappingProxyType[str, Any],
         region: str,
+        entry_id: str,
     ) -> None:
         """Initialise area sensor with a data instance and site."""
         super().__init__(coordinator)
@@ -228,6 +248,7 @@ class NeaPM25Sensor(CoordinatorEntity, SensorEntity):
         self._platform = "sensor"
         self._prefix = config[CONF_SENSORS][CONF_PREFIX]
         self._region = region
+        self._entry_id = entry_id
         self.entity_id = (
             (self._platform + "." + self._prefix + "_pm25" + self._region)
             .lower()
@@ -249,13 +270,8 @@ class NeaPM25Sensor(CoordinatorEntity, SensorEntity):
         )
 
     @property
-    def icon(self):
-        """Return the icon to use in the frontend"""
-        return "mdi:air-filter"
-
-    @property
-    def state(self):
-        """Return the weather condition."""
+    def native_value(self):
+        """Return the PM2.5 reading."""
         return self.coordinator.data.pm25.data[self._region.lower()]
 
     @property
@@ -270,19 +286,25 @@ class NeaPM25Sensor(CoordinatorEntity, SensorEntity):
         """Device info."""
         return DeviceInfo(
             name="Weather forecast coordinator",
-            identifiers={(DOMAIN,)},  # type: ignore[arg-type]
+            identifiers={(DOMAIN, self._entry_id)},
             manufacturer="NEA Weather",
             model="data.gov.sg API Polling",
         )
 
+
 class NeaRainSensor(CoordinatorEntity, SensorEntity):
     """Implementation of a NEA Weather sensor for a rainfall sensor in Singapore."""
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_device_class = SensorDeviceClass.PRECIPITATION
+    _attr_native_unit_of_measurement = UnitOfPrecipitationDepth.MILLIMETERS
 
     def __init__(
         self,
         coordinator,
         config: MappingProxyType[str, Any],
         rain_sensor_id: str,
+        entry_id: str,
     ) -> None:
         """Initialise area sensor with a data instance and site."""
         super().__init__(coordinator)
@@ -290,6 +312,7 @@ class NeaRainSensor(CoordinatorEntity, SensorEntity):
         self._platform = "sensor"
         self._prefix = config[CONF_SENSORS][CONF_PREFIX]
         self._rain_sensor_id = rain_sensor_id
+        self._entry_id = entry_id
         self.entity_id = (
             (self._platform + "." + self._prefix + "_rainfall_" + self._rain_sensor_id)
             .lower()
@@ -312,8 +335,8 @@ class NeaRainSensor(CoordinatorEntity, SensorEntity):
         return "mdi:weather-pouring"
 
     @property
-    def state(self):
-        """Return the weather condition."""
+    def native_value(self):
+        """Return the rainfall amount."""
         return self.coordinator.data.rain.data[self._rain_sensor_id]["value"]
 
     @property
@@ -321,19 +344,19 @@ class NeaRainSensor(CoordinatorEntity, SensorEntity):
         """Return the entity picture url to display rainfall quantity"""
         rainfall_quantity = (
             0
-            if self.state == 0
+            if self.native_value == 0
             else 0.2
-            if self.state < 0.35
+            if self.native_value < 0.35
             else 0.5
-            if self.state < 0.75
+            if self.native_value < 0.75
             else 1
-            if self.state < 1.5
+            if self.native_value < 1.5
             else 2
-            if self.state < 2.5
+            if self.native_value < 2.5
             else 3
-            if self.state < 3.5
+            if self.native_value < 3.5
             else 4
-            if self.state < 4.5
+            if self.native_value < 4.5
             else 5
         )
 
@@ -360,24 +383,30 @@ class NeaRainSensor(CoordinatorEntity, SensorEntity):
         """Device info."""
         return DeviceInfo(
             name="Weather forecast coordinator",
-            identifiers={(DOMAIN,)},  # type: ignore[arg-type]
+            identifiers={(DOMAIN, self._entry_id)},
             manufacturer="NEA Weather",
             model="data.gov.sg API Polling",
         )
 
+
 class NeaUVSensor(CoordinatorEntity, SensorEntity):
     """Implementation of a NEA UV sensor in Singapore."""
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:weather-sunny"
 
     def __init__(
         self,
         coordinator,
         config: MappingProxyType[str, Any],
+        entry_id: str,
     ) -> None:
         """Initialise area sensor with a data instance and site."""
         super().__init__(coordinator)
         self.coordinator = coordinator
         self._platform = "sensor"
         self._prefix = config[CONF_SENSORS][CONF_PREFIX]
+        self._entry_id = entry_id
         self.entity_id = (
             (self._platform + "." + self._prefix + "_uv")
             .lower()
@@ -392,18 +421,11 @@ class NeaUVSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self):
         """Return the friendly name of the sensor."""
-        return (
-            ("UV Index in Singapore")
-        )
+        return "UV Index in Singapore"
 
     @property
-    def icon(self):
-        """Return the icon to use in the frontend"""
-        return "mdi:weather-sunny"
-
-    @property
-    def state(self):
-        """Return the weather condition."""
+    def native_value(self):
+        """Return the UV index."""
         return self.coordinator.data.uvindex.uv_index
 
     @property
@@ -418,7 +440,7 @@ class NeaUVSensor(CoordinatorEntity, SensorEntity):
         """Device info."""
         return DeviceInfo(
             name="Weather forecast coordinator",
-            identifiers={(DOMAIN,)},  # type: ignore[arg-type]
+            identifiers={(DOMAIN, self._entry_id)},
             manufacturer="NEA Weather",
             model="data.gov.sg API Polling",
         )

@@ -1,7 +1,6 @@
 """Support for retrieving weather data from NEA."""
 from __future__ import annotations
 
-import asyncio
 import logging
 from types import MappingProxyType
 from typing import Any
@@ -15,7 +14,7 @@ from homeassistant.components.camera import Camera, CameraEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME, CONF_PREFIX, CONF_SENSORS
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.httpx_client import get_async_client
 
@@ -40,9 +39,10 @@ async def async_setup_entry(
     coordinator: NeaWeatherDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
     ]
+    entry_id = config_entry.entry_id
 
-    async_add_entities([NeaRainCamera(hass, coordinator, config_entry.data)])
-    async_add_entities([NeaAnimatedRainCamera(hass, coordinator, config_entry.data)])
+    async_add_entities([NeaRainCamera(hass, coordinator, config_entry.data, entry_id)])
+    async_add_entities([NeaAnimatedRainCamera(hass, coordinator, config_entry.data, entry_id)])
 
 
 class NeaRainCamera(Camera):
@@ -53,6 +53,7 @@ class NeaRainCamera(Camera):
         hass: HomeAssistant,
         coordinator,
         config: MappingProxyType[str, Any],
+        entry_id: str,
     ) -> None:
         """Initialise area sensor with a data instance and site."""
         super().__init__()
@@ -60,7 +61,6 @@ class NeaRainCamera(Camera):
         self.coordinator = coordinator
         self._name = config.get(CONF_NAME) + " Rain Map"
         self._limit_refetch = True
-        self._supported_features = CameraEntityFeature(0)
         self.content_type = "image/png"
         self.verify_ssl = True
         self._last_query_time = None
@@ -70,6 +70,7 @@ class NeaRainCamera(Camera):
         self._last_url = None
         self._platform = "camera"
         self._prefix = config[CONF_SENSORS][CONF_PREFIX]
+        self._entry_id = entry_id
         self.entity_id = (
             (self._platform + "." + self._prefix + "_rain_map")
             .lower()
@@ -88,19 +89,6 @@ class NeaRainCamera(Camera):
     def name(self):
         """Return the name of this device."""
         return self._name
-
-    @property
-    def supported_features(self):
-        """Return supported features for this camera."""
-        return self._supported_features
-
-    def camera_image(
-        self, width: int | None = None, height: int | None = None
-    ) -> bytes | None:
-        """Return bytes of camera image."""
-        return asyncio.run_coroutine_threadsafe(
-            self.async_camera_image(), self.hass.loop
-        ).result()
 
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None
@@ -207,7 +195,7 @@ class NeaRainCamera(Camera):
         """Device info."""
         return DeviceInfo(
             name="Weather forecast coordinator",
-            identifiers={(DOMAIN,)},  # type: ignore[arg-type]
+            identifiers={(DOMAIN, self._entry_id)},
             manufacturer="NEA Weather",
             model="data.gov.sg API Polling",
         )
@@ -221,6 +209,7 @@ class NeaAnimatedRainCamera(Camera):
         hass: HomeAssistant,
         coordinator,
         config: MappingProxyType[str, Any],
+        entry_id: str,
     ) -> None:
         """Initialise area sensor with a data instance and site."""
         super().__init__()
@@ -237,6 +226,7 @@ class NeaAnimatedRainCamera(Camera):
         self.verify_ssl = True
         self._platform = "camera"
         self._prefix = config[CONF_SENSORS][CONF_PREFIX]
+        self._entry_id = entry_id
         self.entity_id = (
             (self._platform + "." + self._prefix + "_animated_rain_map")
             .lower()
@@ -250,6 +240,11 @@ class NeaAnimatedRainCamera(Camera):
     def unique_id(self):
         """Return the unique ID."""
         return self._prefix + " Animated Rain Map"
+
+    @property
+    def name(self) -> str:
+        """Return the name of this device."""
+        return self._name
 
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None
@@ -313,7 +308,6 @@ class NeaAnimatedRainCamera(Camera):
                         ).isoformat(),
                         next_image_url,
                     )
-                # self._last_gif = response.content
                 self._last_gif_time = current_gif_time
                 self._last_gif_time_pretty = datetime.strptime(
                     str(current_gif_time), "%Y%m%d%H%M"
@@ -386,9 +380,7 @@ class NeaAnimatedRainCamera(Camera):
                     self._last_gif = buff.getvalue()
                 return self._last_gif
             except Exception as e:
-                _LOGGER.warning(
-                    "Error %s", e
-                )  # leaving this here for now in case something unexpected happens
+                _LOGGER.warning("Error creating animated GIF: %s", e)
 
         _current_query_time = int(
             datetime.strftime(datetime.now(timezone(timedelta(hours=8))), "%Y%m%d%H%M")
@@ -409,3 +401,13 @@ class NeaAnimatedRainCamera(Camera):
             "Updated at": self._last_gif_time_pretty,
             "URL": self._last_url,
         }
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Device info."""
+        return DeviceInfo(
+            name="Weather forecast coordinator",
+            identifiers={(DOMAIN, self._entry_id)},
+            manufacturer="NEA Weather",
+            model="data.gov.sg API Polling",
+        )
