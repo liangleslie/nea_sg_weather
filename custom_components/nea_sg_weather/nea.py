@@ -1,7 +1,6 @@
 """The NEA Singapore Weather API wrapper."""
 
 from __future__ import annotations
-from ast import Str
 import math
 from datetime import datetime, timedelta, timezone, UTC
 import logging
@@ -11,14 +10,11 @@ import aiohttp
 
 from homeassistant.components.weather import (
     ATTR_FORECAST_CONDITION,
-    ATTR_FORECAST_TEMP,
-    ATTR_FORECAST_TEMP_LOW,
-    ATTR_FORECAST_TIME,
-    ATTR_FORECAST_WIND_BEARING,
-    ATTR_FORECAST_WIND_SPEED,
     ATTR_FORECAST_NATIVE_TEMP,
     ATTR_FORECAST_NATIVE_TEMP_LOW,
     ATTR_FORECAST_NATIVE_WIND_SPEED,
+    ATTR_FORECAST_TIME,
+    ATTR_FORECAST_WIND_BEARING,
 )
 
 from .const import (
@@ -53,7 +49,7 @@ def list_mean(values):
 class NeaData:
     """Class for NEA data objects"""
 
-    def __init__(self, url: Str, url2: Str) -> None:
+    def __init__(self, url: str, url2: str) -> None:
         self.url = url
         self.url2 = url2
         self.date_time = (
@@ -68,46 +64,45 @@ class NeaData:
         self._resp = ""
         self._resp2 = ""
 
-    async def async_init(self):
+    async def async_init(self, session: aiohttp.ClientSession) -> None:
         """Async function to await in main loop"""
-        await self.fetch_data(self.url, self.url2)
+        await self.fetch_data(session, self.url, self.url2)
         self.response = self._resp if self._resp2 == "" else self._resp2
 
-    async def fetch_data(self, url1: Str, url2: Str):
+    async def fetch_data(self, session: aiohttp.ClientSession, url1: str, url2: str) -> None:
         """GET response from url"""
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                url1, params=self._params, headers=self._headers
-            ) as resp:
-                self._resp = await resp.json()
-                resp.raise_for_status()
+        async with session.get(
+            url1, params=self._params, headers=self._headers
+        ) as resp:
+            self._resp = await resp.json()
+            resp.raise_for_status()
 
-                # check if data response is too short
-                _LOGGER.debug(
-                    "%s: response received, length: %s",
+            # check if data response is too short
+            _LOGGER.debug(
+                "%s: response received, length: %s",
+                self.__class__.__name__,
+                len(str(self._resp)),
+            )
+            if len(str(self._resp)) > 120:
+                self.process_data()
+            else:
+                _LOGGER.warning(
+                    "%s: Response from %s too short.",
                     self.__class__.__name__,
-                    len(str(self._resp)),
+                    url1,
                 )
-                if len(str(self._resp)) > 120:
-                    self.process_data()
-                else:
+                if url2 != "":
                     _LOGGER.warning(
-                        "%s: Response from %s too short.",
+                        "%s:  Scraping NEA website for alternative data: %s",
                         self.__class__.__name__,
-                        url1,
+                        url2,
                     )
-                    if url2 != "":
-                        _LOGGER.warning(
-                            "%s:  Scraping NEA website for alternative data: %s",
-                            self.__class__.__name__,
-                            url2,
-                        )
-                        async with session.get(
-                            url2, params=self._params2, headers=self._headers
-                        ) as resp2:
-                            self._resp2 = await resp2.json()
-                            resp2.raise_for_status()
-                    self.process_secondary_data()
+                    async with session.get(
+                        url2, params=self._params2, headers=self._headers
+                    ) as resp2:
+                        self._resp2 = await resp2.json()
+                        resp2.raise_for_status()
+                self.process_secondary_data()
 
     def process_data(self):
         """Function intended to be replaced by subclasses to process API response"""
@@ -278,9 +273,9 @@ class Forecast4day(NeaData):
                     self.forecast.append(
                         {
                             ATTR_FORECAST_TIME: entry["timestamp"],
-                            ATTR_FORECAST_TEMP: entry["temperature"]["high"],
-                            ATTR_FORECAST_TEMP_LOW: entry["temperature"]["low"],
-                            ATTR_FORECAST_WIND_SPEED: entry["wind"]["speed"]["high"],
+                            ATTR_FORECAST_NATIVE_TEMP: entry["temperature"]["high"],
+                            ATTR_FORECAST_NATIVE_TEMP_LOW: entry["temperature"]["low"],
+                            ATTR_FORECAST_NATIVE_WIND_SPEED: entry["wind"]["speed"]["high"],
                             ATTR_FORECAST_WIND_BEARING: entry["wind"]["direction"],
                             ATTR_FORECAST_CONDITION: condition,
                         }
@@ -298,9 +293,9 @@ class Forecast4day(NeaData):
                     self.forecast.append(
                         {
                             ATTR_FORECAST_TIME: entry["timestamp"],
-                            ATTR_FORECAST_TEMP: entry["temperature"]["high"],
-                            ATTR_FORECAST_TEMP_LOW: entry["temperature"]["low"],
-                            ATTR_FORECAST_WIND_SPEED: (entry["wind"]["speed"]["high"] + entry["wind"]["speed"]["low"])/2,
+                            ATTR_FORECAST_NATIVE_TEMP: entry["temperature"]["high"],
+                            ATTR_FORECAST_NATIVE_TEMP_LOW: entry["temperature"]["low"],
+                            ATTR_FORECAST_NATIVE_WIND_SPEED: (entry["wind"]["speed"]["high"] + entry["wind"]["speed"]["low"]) / 2,
                             ATTR_FORECAST_WIND_BEARING: entry["wind"]["direction"],
                             ATTR_FORECAST_CONDITION: condition,
                         }
@@ -354,7 +349,7 @@ class Humidity(NeaData):
 
         try:
             self.humd_avg = statistics.fmean([x["value"] for x in self._resp["data"]["readings"][0]["data"]])
-        except:
+        except statistics.StatisticsError:
             self.humd_avg = 0
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
@@ -479,10 +474,10 @@ class Wind:
         self.wind_dir_avg: float
         self.response: dict
 
-    async def async_init(self):
+    async def async_init(self, session: aiohttp.ClientSession) -> None:
         """Async function to await in main loop"""
-        await self.direction.async_init()
-        await self.speed.async_init()
+        await self.direction.async_init(session)
+        await self.speed.async_init(session)
         self.response = {
             "wind_speed": self.speed.response,
             "wind_direction": self.direction.response,

@@ -6,45 +6,32 @@ from types import MappingProxyType
 from typing import Any
 
 from homeassistant.components.weather import (
+    ATTR_FORECAST_CONDITION,
+    ATTR_FORECAST_NATIVE_TEMP,
+    ATTR_FORECAST_NATIVE_TEMP_LOW,
+    ATTR_FORECAST_NATIVE_WIND_SPEED,
+    ATTR_FORECAST_TIME,
+    ATTR_FORECAST_WIND_BEARING,
     Forecast,
     WeatherEntity,
     WeatherEntityFeature,
 )
-from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_NAME,
-    CONF_SELECTOR,
     UnitOfTemperature,
     UnitOfLength,
     UnitOfPressure,
     UnitOfSpeed,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import ATTRIBUTION, DOMAIN, MAP_CONDITION
 
 _LOGGER = logging.getLogger(__name__)
-
-
-async def async_setup_platform(
-    hass: HomeAssistant,
-    config: ConfigType,
-    async_add_entities: AddEntitiesCallback,
-    discovery_info: DiscoveryInfoType | None = None,
-) -> None:
-    """Set up the NEA Singapore Weather weather entity from YAML (OLD)"""
-    _LOGGER.warning("Loading NEA Weather via platform config is deprecated")
-    config = {CONF_SELECTOR: "WEATHER", **config}
-
-    hass.async_create_task(
-        hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": SOURCE_IMPORT}, data=config
-        )
-    )
 
 
 async def async_setup_entry(
@@ -57,7 +44,7 @@ async def async_setup_entry(
 
     async_add_entities(
         [
-            NeaWeather(coordinator, config_entry.data),
+            NeaWeather(coordinator, config_entry.data, config_entry.entry_id),
         ]
     )
 
@@ -69,18 +56,19 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
     _attr_native_precipitation_unit = UnitOfLength.MILLIMETERS
     _attr_native_pressure_unit = UnitOfPressure.HPA
     _attr_native_wind_speed_unit = UnitOfSpeed.KNOTS
-    _attr_supported_features = (WeatherEntityFeature.FORECAST_DAILY
-                                | WeatherEntityFeature.FORECAST_HOURLY)
+    _attr_supported_features = WeatherEntityFeature.FORECAST_DAILY
 
     def __init__(
         self,
         coordinator,
         config: MappingProxyType[str, Any],
+        entry_id: str,
     ) -> None:
         """Initialise the platform with a data instance and site."""
         super().__init__(coordinator)
         self.coordinator = coordinator
         self._name = config[CONF_NAME]
+        self._entry_id = entry_id
 
     @property
     def available(self):
@@ -133,11 +121,6 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
         return MAP_CONDITION.get(self.coordinator.data.forecast2hr.current_condition)
 
     @property
-    def forecast(self):
-        """Return the forecast array. Forecast API returns condition in a sentence, so we try to pick out keywords to map to a weather condition"""
-        return self.coordinator.data.forecast4day.forecast
-
-    @property
     def extra_state_attributes(self) -> dict:
         """Return dict of additional properties to attach to sensors."""
         return {"Updated at": self.coordinator.data.temperature.timestamp}
@@ -147,7 +130,7 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
         """Device info."""
         return DeviceInfo(
             name="Weather forecast coordinator",
-            identifiers={(DOMAIN,)},  # type: ignore[arg-type]
+            identifiers={(DOMAIN, self._entry_id)},
             manufacturer="NEA Weather",
             model="data.gov.sg API Polling",
         )
@@ -156,11 +139,16 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
         """Return the daily forecast in native units.
         Only implement this method if `WeatherEntityFeature.FORECAST_DAILY` is set
         """
-        return self.coordinator.data.forecast4day.forecast
-
-    async def async_forecast_hourly(self) -> list[Forecast] | None:
-        """Return the hourly forecast in native units.
-        We do not have hourly forecast data so 2 hourly will do
-        Only implement this method if `WeatherEntityFeature.FORECAST_HOURLY` is set
-        """
-        return self.coordinator.data.forecast2hr.area_forecast
+        forecasts = []
+        for entry in self.coordinator.data.forecast4day.forecast:
+            forecasts.append(
+                Forecast(
+                    datetime=entry[ATTR_FORECAST_TIME],
+                    condition=entry[ATTR_FORECAST_CONDITION],
+                    native_temperature=entry[ATTR_FORECAST_NATIVE_TEMP],
+                    native_templow=entry[ATTR_FORECAST_NATIVE_TEMP_LOW],
+                    native_wind_speed=entry[ATTR_FORECAST_NATIVE_WIND_SPEED],
+                    wind_bearing=entry[ATTR_FORECAST_WIND_BEARING],
+                )
+            )
+        return forecasts or None

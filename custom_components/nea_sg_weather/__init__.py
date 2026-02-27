@@ -5,10 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import logging
 
-from aiohttp.client_reqrep import ClientResponse
-from async_timeout import timeout
-import httpx
-from requests.exceptions import ConnectionError as ConnectError, HTTPError, Timeout
+from asyncio import timeout
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -18,6 +15,7 @@ from homeassistant.const import (
     CONF_REGION,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .nea import (
@@ -75,9 +73,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
 
     _platforms = get_platforms(config_entry)["platforms"]
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setups(config_entry, _platforms)
-    )
+    await hass.config_entries.async_forward_entry_setups(config_entry, _platforms)
 
     return True
 
@@ -161,8 +157,9 @@ class NeaWeatherData:
                 _data_objects += [self.data.forecast24hr]
         _data_objects = set(_data_objects)
 
+        session = async_get_clientsession(self._hass)
         for data_object in _data_objects:
-            await data_object.async_init()
+            await data_object.async_init(session)
             _response[data_object.__class__.__name__] = data_object.response
 
         # _LOGGER.debug("Data is: %s", _response)

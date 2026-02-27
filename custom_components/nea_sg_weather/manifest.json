@@ -4,5 +4,7 @@
   "config_flow": true,
   "codeowners": ["@kianhean"],
   "iot_class": "cloud_polling",
-  "version": "2.5.4"
+  "version": "2.6.0",
+  "homeassistant": "2024.6.0",
+  "requirements": ["Pillow>=9.0.0"]
 }
