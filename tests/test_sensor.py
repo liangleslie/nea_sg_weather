@@ -260,6 +260,19 @@ class TestNeaRainSensor:
         sensor = NeaRainSensor(coord, _make_config(), "S77", "entry1")
         assert sensor.extra_state_attributes["Updated at"] == "2024-03-01T08:00:00+08:00"
 
+    def test_available_when_station_in_data(self):
+        coord = _make_coordinator(rain_station="S77")
+        coord.last_update_success = True
+        sensor = NeaRainSensor(coord, _make_config(), "S77", "entry1")
+        assert sensor.available is True
+
+    def test_available_false_when_station_missing_from_data(self):
+        coord = _make_coordinator(rain_station="S77")
+        coord.last_update_success = True
+        sensor = NeaRainSensor(coord, _make_config(), "S99", "entry1")
+        # S99 is not in rain.data (only S77 is), so sensor should be unavailable
+        assert sensor.available is False
+
 
 # ---------------------------------------------------------------------------
 # NeaUVSensor

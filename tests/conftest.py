@@ -15,6 +15,10 @@ class _CoordinatorEntity:
     def __init__(self, coordinator=None):
         self.coordinator = coordinator
 
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success
+
 
 class _DataUpdateCoordinator:
     def __init__(self, *args, **kwargs):

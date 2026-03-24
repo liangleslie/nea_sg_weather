@@ -14,11 +14,12 @@ Add this integration to Home Assistant using HACS, or copy everything in `custom
 
 Follow the integration config flow to set up the following entities:
 - `weather`: weather entity with 4 day forecasts
-- `area` (town) sensors: current weather conditions for up to 47 areas/towns in Singapore 
-- `region` sensors: 24 weather condition forecast for North/South/East/West/Central regions of Singapore
-- `rain` camera: 2 camera entities for static and animated rain map overlays that are updated every 5 minutes from NEA
+- `area` (town) sensors: current weather conditions for up to 47 areas/towns in Singapore
+- `region` sensors: 24 hour weather condition forecast for North/South/East/West/Central regions of Singapore
+- `rain` camera: 2 camera entities for static and animated rain map overlays updated every 5 minutes from NEA
+- `rain` sensors: one rainfall sensor per active NEA station, fetched live from the API — stations are added and removed automatically as the API changes
 - `pm25` sensors: 5 pm2.5 sensors for North/South/East/West/Central regions of Singapore
-- `uv_index` sensor: 1 uv index for Singapore
+- `uv_index` sensor: UV index for Singapore
 
 
 ## Weather Map Overlays
@@ -34,10 +35,11 @@ For the overlays to display properly, you will need the `area`, `region` and `ra
 
 Instructions for how to integrate the `yaml` files are included in the various files in the `nea_sg_weather/yaml` folder.
 
-## Rainfall map
+## Rainfall sensors
 
-Starting in v1.5, rainfall sensors have location attributes.
-Users can display sensors on a map card in Lovelace UI.
+Rainfall sensors are created dynamically from the live NEA API — no static station list is used. Orphaned sensors (stations decommissioned by NEA) are automatically removed from Home Assistant on startup and whenever the station list changes at runtime.
+
+Sensors include location attributes so they can be displayed on a Lovelace map card.
 
 For entity pictures to display correctly, copy all image files in `www/weather/` to your `config/www/weather/` folder.
 ![image](https://user-images.githubusercontent.com/57534857/171048147-5e6dcfd3-40c4-4eff-a09c-f1f6c31ddb92.png)
