@@ -547,7 +547,7 @@ class Rain(NeaData):
         # Store rainfall data
         resp_data = self._resp["data"]["readings"][0]["data"]
 
-        self.station_list = RAIN_SENSOR_LIST
+        self.station_list = self._resp["data"]["stations"]
         _current_station_list = [reading["stationId"] for reading in resp_data]
 
         self.data = dict()
