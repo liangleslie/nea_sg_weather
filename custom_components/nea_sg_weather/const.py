@@ -24,7 +24,7 @@ DOMAIN = "nea_sg_weather"
 ATTRIBUTION = "Weather data from Singapore's NEA"
 DEFAULT_NAME = "Singapore Weather"
 DEFAULT_SCAN_INTERVAL = 15
-DEFAULT_TIMEOUT = 10
+DEFAULT_TIMEOUT = 60
 HEADERS = {
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36",
     "referer": "https://www.nea.gov.sg",
