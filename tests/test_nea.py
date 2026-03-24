@@ -556,13 +556,21 @@ class TestWindCalcStatus:
 # ---------------------------------------------------------------------------
 
 class TestRain:
-    def _make_resp(self, station_readings, timestamp="2024-01-01T12:00:00+08:00"):
+    def _make_resp(self, station_readings, timestamp="2024-01-01T12:00:00+08:00", stations=None):
+        if stations is None:
+            seen = {r["stationId"] for r in station_readings}
+            stations = [
+                {"id": sid, "deviceId": sid, "name": sid,
+                 "location": {"latitude": 1.3, "longitude": 103.8}}
+                for sid in seen
+            ]
         return {
             "data": {
+                "stations": stations,
                 "readings": [{
                     "timestamp": timestamp,
                     "data": station_readings,
-                }]
+                }],
             }
         }
 
@@ -580,18 +588,21 @@ class TestRain:
         assert r.data["S77"]["value"] == 2.5
 
     def test_process_data_missing_station_defaults_to_zero(self):
-        """Stations absent from API response should be set to 0."""
+        """Stations in the station list but absent from readings should be set to 0."""
         r = Rain()
-        # Provide response with no stations
-        r._resp = self._make_resp([])
+        stations = [{"id": "S77", "deviceId": "S77", "name": "Alexandra Road",
+                     "location": {"latitude": 1.2937, "longitude": 103.8125}}]
+        # Stations present but no readings
+        r._resp = self._make_resp([], stations=stations)
         r.process_data()
-        # All stations in RAIN_SENSOR_LIST should still appear with value 0
         for station in r.station_list:
             assert r.data[station["id"]]["value"] == 0
 
     def test_process_data_station_has_name_and_location(self):
         r = Rain()
-        r._resp = self._make_resp([{"stationId": "S77", "value": 0.5}])
+        stations = [{"id": "S77", "deviceId": "S77", "name": "Alexandra Road",
+                     "location": {"latitude": 1.2937, "longitude": 103.8125}}]
+        r._resp = self._make_resp([{"stationId": "S77", "value": 0.5}], stations=stations)
         r.process_data()
         assert "name" in r.data["S77"]
         assert "location" in r.data["S77"]
@@ -612,10 +623,15 @@ class TestRain:
             assert station["id"] in r.data
 
     def test_process_data_all_stations_present(self):
-        """Every station from RAIN_SENSOR_LIST should be in data after process_data."""
+        """Every station returned by the API should be in data after process_data."""
         r = Rain()
-        r._resp = self._make_resp([])
+        stations = [
+            {"id": "S77", "deviceId": "S77", "name": "Alexandra Road",
+             "location": {"latitude": 1.2937, "longitude": 103.8125}},
+            {"id": "S109", "deviceId": "S109", "name": "Ang Mo Kio Avenue 5",
+             "location": {"latitude": 1.3764, "longitude": 103.8492}},
+        ]
+        r._resp = self._make_resp([], stations=stations)
         r.process_data()
-        from custom_components.nea_sg_weather.const import RAIN_SENSOR_LIST
-        for station in RAIN_SENSOR_LIST:
+        for station in stations:
             assert station["id"] in r.data
