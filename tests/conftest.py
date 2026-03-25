@@ -113,6 +113,37 @@ _ha_camera = MagicMock()
 _ha_camera.Camera = _CameraEntity
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# aiohttp stub — real exception hierarchy so except clauses work in tests
+# ---------------------------------------------------------------------------
+
+def _make_aiohttp_stub():
+    stub = MagicMock()
+
+    class ClientError(Exception):
+        pass
+
+    class ClientResponseError(ClientError):
+        def __init__(self, request_info=None, history=None, *, status=None, **kwargs):
+            super().__init__(status)
+            self.status = status
+
+    class ClientConnectionError(ClientError):
+        pass
+
+    class ClientTimeout:
+        def __init__(self, **kwargs):
+            pass
+
+    stub.ClientError = ClientError
+    stub.ClientResponseError = ClientResponseError
+    stub.ClientConnectionError = ClientConnectionError
+    stub.ClientTimeout = ClientTimeout
+    stub.ClientSession = MagicMock()
+    return stub
+
+
+# ---------------------------------------------------------------------------
 # Patch sys.modules before any source imports happen
 # ---------------------------------------------------------------------------
 sys.modules.update({
@@ -131,7 +162,7 @@ sys.modules.update({
     "homeassistant.helpers.device_registry": MagicMock(),
     "homeassistant.helpers.entity_platform": MagicMock(),
     "homeassistant.helpers.config_validation": MagicMock(),
-    "aiohttp": MagicMock(),
+    "aiohttp": _make_aiohttp_stub(),
     "voluptuous": MagicMock(),
     "PIL": MagicMock(),
     "PIL.Image": MagicMock(),

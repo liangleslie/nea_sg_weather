@@ -121,6 +121,19 @@ class NeaWeatherDataUpdateCoordinator(DataUpdateCoordinator):
             raise UpdateFailed(f"Update failed: {err}") from err
 
 
+_ATTR_BY_CLASS: dict[str, str] = {
+    "Forecast2hr": "forecast2hr",
+    "Forecast24hr": "forecast24hr",
+    "Forecast4day": "forecast4day",
+    "Temperature": "temperature",
+    "Humidity": "humidity",
+    "Wind": "wind",
+    "Rain": "rain",
+    "UVIndex": "uvindex",
+    "PM25": "pm25",
+}
+
+
 class NeaWeatherData:
     """Get the latest data from NEA API."""
 
@@ -129,13 +142,13 @@ class NeaWeatherData:
         self._hass = hass
         self._config_entry = config_entry
         self.data: self.NeaData
+        self._last_data: NeaWeatherData.NeaData | None = None
 
     async def async_update(self) -> NeaData:
         """Get the latest data from NEA API for entities registered."""
         # Consolidate data requests to avoid redundant requests
         self.data = self.NeaData()
         _data_objects = list()
-        _response = dict()
         if self._config_entry.data[CONF_WEATHER]:
             _data_objects += [
                 self.data.forecast2hr,
@@ -158,11 +171,30 @@ class NeaWeatherData:
         _data_objects = set(_data_objects)
 
         session = async_get_clientsession(self._hass)
+        failed: list[str] = []
         for data_object in _data_objects:
-            await data_object.async_init(session)
-            _response[data_object.__class__.__name__] = data_object.response
+            class_name = data_object.__class__.__name__
+            try:
+                await data_object.async_init(session)
+            except Exception as err:  # noqa: BLE001
+                attr = _ATTR_BY_CLASS.get(class_name)
+                if self._last_data is not None and attr is not None:
+                    _LOGGER.warning(
+                        "%s: fetch failed (%s) — using stale data.",
+                        class_name, err,
+                    )
+                    setattr(self.data, attr, getattr(self._last_data, attr))
+                else:
+                    _LOGGER.warning(
+                        "%s: fetch failed (%s) — no stale data available.",
+                        class_name, err,
+                    )
+                failed.append(class_name)
 
-        # _LOGGER.debug("Data is: %s", _response)
+        if failed and len(failed) == len(_data_objects) and self._last_data is None:
+            raise UpdateFailed(f"All data fetches failed on first attempt: {failed}")
+
+        self._last_data = self.data
         _LOGGER.debug("Coordinator was updated at %s", self.data.query_time)
         return self.data
 

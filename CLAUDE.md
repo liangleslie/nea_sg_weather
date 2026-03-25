@@ -81,7 +81,29 @@ Rain station entities are built from the live API response (`Rain.station_list`)
 
 `NeaRainSensor.available` returns `False` when the station ID is absent from `coordinator.data.rain.data`, preventing `KeyError` crashes in the brief window between a station disappearing from the API and its entity being removed.
 
+## API Failure Handling
+
+Each API call in `nea.py` is wrapped with a 10-second per-request timeout (`_REQUEST_TIMEOUT`). `NeaData.fetch_data` handles failures in two stages:
+
+1. **Primary endpoint** — if the request raises `aiohttp.ClientError` or `asyncio.TimeoutError`, or the response is too short, the secondary endpoint is tried (where configured).
+2. **Secondary endpoint** — if this also fails, the exception propagates to the caller.
+
+`Wind.calc_wind_status` returns zero wind (rather than crashing with `ZeroDivisionError`) when no matching station pairs are found.
+
+### Stale data preservation
+
+`NeaWeatherData` keeps a `_last_data` reference to the most recent successful fetch. Inside `async_update`, every data object is fetched inside its own `try/except`. On failure:
+
+- If `_last_data` exists, `setattr(self.data, attr, getattr(self._last_data, attr))` substitutes the stale object so entities keep their last known value.
+- If there is no previous data (first run, all objects failed), `UpdateFailed` is raised as normal.
+
+The class-name → attribute mapping is kept in `_ATTR_BY_CLASS` at module level in `__init__.py`.
+
 ## CI
 
 GitHub Actions (`.github/workflows/tests.yml`) runs the suite on Python 3.11
 and 3.12 for every push to `main`/`master` and every pull request.
+
+The HA integration test workflow (`.github/workflows/ha-test.yml`) uses
+`requirements-ha-test.txt`. The `pytest-homeassistant-custom-component` package
+is pinned to `>=0.13.0,<1.0.0` because version 1.x does not exist for Python 3.12.

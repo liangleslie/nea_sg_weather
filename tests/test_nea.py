@@ -512,18 +512,15 @@ class TestWindCalcStatus:
         assert 0 <= result["agg_wind_direction"] < 360
 
     def test_mismatched_station_ids_ignored(self):
-        """Station IDs that don't match are not included in the calculation.
-
-        NOTE: When no stations match, readings_used stays 0 and a ZeroDivisionError
-        is raised. This is a known limitation of calc_wind_status — callers must
-        ensure at least one matching station pair exists.
-        """
+        """Station IDs that don't match produce zero wind rather than crashing."""
         w = self._wind()
-        with pytest.raises(ZeroDivisionError):
-            w.calc_wind_status(
-                wind_speed=[{"stationId": "S1", "value": 10}],
-                wind_direction=[{"stationId": "S99", "value": 0}],
-            )
+        result = w.calc_wind_status(
+            wind_speed=[{"stationId": "S1", "value": 10}],
+            wind_direction=[{"stationId": "S99", "value": 0}],
+        )
+        assert result["readings_used"] == 0
+        assert result["agg_wind_speed"] == 0
+        assert result["agg_wind_direction"] == 0
 
     def test_result_contains_all_keys(self):
         w = self._wind()
@@ -635,3 +632,139 @@ class TestRain:
         r.process_data()
         for station in stations:
             assert station["id"] in r.data
+
+
+# ---------------------------------------------------------------------------
+# fetch_data / async_init error handling
+# ---------------------------------------------------------------------------
+
+import asyncio as _asyncio
+from unittest.mock import AsyncMock, patch, MagicMock
+
+
+class TestFetchDataErrorHandling:
+    """Tests for NeaData.fetch_data resilience."""
+
+    def _mock_session(self, side_effect=None, json_data=None, status=200):
+        """Return a mock aiohttp.ClientSession whose get() raises or returns data."""
+        import aiohttp as _aiohttp
+
+        if side_effect is not None:
+            cm = MagicMock()
+            cm.__aenter__ = AsyncMock(side_effect=side_effect)
+            cm.__aexit__ = AsyncMock(return_value=False)
+        else:
+            resp = MagicMock()
+            resp.status = status
+            resp.raise_for_status = MagicMock(
+                side_effect=_aiohttp.ClientResponseError(None, None, status=status)
+                if status >= 400 else None
+            )
+            resp.json = AsyncMock(return_value=json_data or {})
+            cm = MagicMock()
+            cm.__aenter__ = AsyncMock(return_value=resp)
+            cm.__aexit__ = AsyncMock(return_value=False)
+
+        session = MagicMock()
+        session.get = MagicMock(return_value=cm)
+        return session
+
+    async def _run(self, coro):
+        return await coro
+
+    def test_primary_timeout_raises_when_no_secondary(self):
+        """A timeout with no secondary URL should propagate as ClientError."""
+        import pytest, aiohttp as _aiohttp
+        from custom_components.nea_sg_weather.nea import Temperature
+
+        t = Temperature()
+        t.url2 = ""  # no secondary
+        session = self._mock_session(side_effect=_asyncio.TimeoutError())
+
+        import asyncio
+        with pytest.raises((_aiohttp.ClientError, _asyncio.TimeoutError)):
+            asyncio.get_event_loop().run_until_complete(t.fetch_data(session, t.url, t.url2))
+
+    def test_primary_client_error_falls_back_to_secondary(self):
+        """A ClientError on primary triggers secondary endpoint fetch for an endpoint that has one."""
+        import aiohttp as _aiohttp, asyncio
+
+        from custom_components.nea_sg_weather.nea import Forecast4day
+
+        f = Forecast4day()
+        assert f.url2 != "", "Forecast4day must have a secondary URL for this test"
+
+        call_count = 0
+
+        class _CM:
+            def __init__(self, url, **kwargs):
+                self._url = url
+
+            async def __aenter__(self):
+                nonlocal call_count
+                call_count += 1
+                if call_count == 1:
+                    raise _aiohttp.ClientError("connection refused")
+                # secondary returns a minimal valid-enough response
+                resp = MagicMock()
+                resp.raise_for_status = MagicMock()
+                resp.json = AsyncMock(return_value={"items": [{"forecasts": []}]})
+                return resp
+
+            async def __aexit__(self, *a):
+                return False
+
+        session = MagicMock()
+        session.get = lambda url, **kw: _CM(url, **kw)
+
+        # process_secondary_data is called with the minimal response; for Forecast4day
+        # it iterates over an empty list, so self.forecast remains [].
+        asyncio.get_event_loop().run_until_complete(f.fetch_data(session, f.url, f.url2))
+        assert call_count == 2  # primary tried then secondary tried
+        assert f.forecast == []  # secondary processed (empty, but no crash)
+
+    def test_both_endpoints_fail_raises(self):
+        """When both primary and secondary fail, an exception is raised."""
+        import aiohttp as _aiohttp, asyncio, pytest
+        from custom_components.nea_sg_weather.nea import Forecast2hr
+
+        f = Forecast2hr()
+
+        async def fake_get(url, **kwargs):
+            raise _aiohttp.ClientError("network down")
+
+        class _CM:
+            def __init__(self, url, **kwargs): pass
+            async def __aenter__(self): raise _aiohttp.ClientError("network down")
+            async def __aexit__(self, *a): return False
+
+        session = MagicMock()
+        session.get = lambda url, **kw: _CM(url, **kw)
+
+        with pytest.raises((_aiohttp.ClientError, _asyncio.TimeoutError)):
+            asyncio.get_event_loop().run_until_complete(
+                f.fetch_data(session, f.url, f.url2)
+            )
+
+
+class TestWindCalcStatusZeroReadings:
+    def test_zero_readings_returns_zero_wind(self):
+        """calc_wind_status with no matching station pairs returns zero wind safely."""
+        from custom_components.nea_sg_weather.nea import Wind
+        w = Wind()
+        result = w.calc_wind_status(
+            wind_speed=[{"stationId": "S1", "value": 10}],
+            wind_direction=[{"stationId": "S99", "value": 45}],
+        )
+        assert result["readings_used"] == 0
+        assert result["agg_wind_speed"] == 0
+        assert result["agg_wind_direction"] == 0
+
+    def test_empty_inputs_returns_zero_wind(self):
+        """calc_wind_status with empty lists returns zero wind safely."""
+        from custom_components.nea_sg_weather.nea import Wind
+        w = Wind()
+        result = w.calc_wind_status(wind_speed=[], wind_direction=[])
+        assert result["readings_used"] == 0
+        assert result["agg_wind_speed"] == 0
+        assert result["agg_wind_direction"] == 0

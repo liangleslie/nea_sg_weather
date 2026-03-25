@@ -1,7 +1,38 @@
 """Fixtures for Home Assistant integration tests."""
 import re
+import threading
 import pytest
 from aioresponses import aioresponses as AioResponses
+
+
+# pytest-homeassistant-custom-component blocks custom integrations by default.
+# This autouse fixture opts every test in ha_tests/ into the allow-list so HA
+# can find and load the integration from the local custom_components/ directory.
+@pytest.fixture(autouse=True)
+def auto_enable_custom_integrations(enable_custom_integrations):
+    """Allow HA to load integrations from the local custom_components/ directory."""
+    yield
+
+
+@pytest.fixture(autouse=True)
+def verify_cleanup():
+    """Override PHAC's verify_cleanup to also allow aiohttp's daemon thread.
+
+    aiohttp ≥3.9 spawns a '_run_safe_shutdown_loop' thread when the connector
+    is first used (via HA's shared ClientSession). PHAC only whitelists
+    _DummyThread and 'waitpid-' threads, so we extend that check here.
+    """
+    threads_before = {t for t in threading.enumerate() if t.is_alive()}
+    yield
+    threads_after = {t for t in threading.enumerate() if t.is_alive()}
+    for thread in threads_after - threads_before:
+        assert (
+            isinstance(thread, threading._DummyThread)
+            or thread.name.startswith("waitpid-")
+            or "_run_safe_shutdown_loop" in thread.name
+            or thread.name.startswith("SyncWorker_")
+        ), f"Unexpected thread left after test: {thread.name!r}"
+
 
 # ---------------------------------------------------------------------------
 # Canned API responses — realistic enough that nea.py process_data() runs
