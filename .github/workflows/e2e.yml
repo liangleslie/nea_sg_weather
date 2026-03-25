@@ -1,0 +1,33 @@
+name: E2E Tests
+
+on:
+  # Run on a schedule so we catch upstream API changes early
+  schedule:
+    - cron: "0 0 * * 1"   # every Monday at midnight UTC
+  # Allow manual runs from the Actions tab
+  workflow_dispatch:
+  # Also run on pushes to main so a fresh PR can catch regressions
+  push:
+    branches: [main, master]
+
+jobs:
+  e2e:
+    name: Live API smoke tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install aiohttp pytest pytest-asyncio
+
+      - name: Run e2e tests
+        # Individual tests skip themselves on network/API errors rather than
+        # failing hard, but we still surface a non-zero exit code if something
+        # unexpected breaks (e.g. import errors, assertion errors on valid data).
+        run: pytest e2e_tests/ -v --tb=short
