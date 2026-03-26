@@ -1,4 +1,4 @@
-v2.5.4
+v2.6.3
 
 - Graceful API failure handling: per-request 10-second timeout; primary endpoint
   errors automatically fall back to secondary endpoint where available
