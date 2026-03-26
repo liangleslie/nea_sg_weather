@@ -1,0 +1,131 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install test dependencies
+        run: pip install -r requirements-test.txt
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short --junit-xml=test-results.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-py${{ matrix.python-version }}
+          path: test-results.xml
+
+      - name: Run tests with coverage report
+        if: matrix.python-version == '3.11'
+        run: |
+          pip install pytest-cov
+          pytest tests/ --cov=custom_components/nea_sg_weather --cov-report=term-missing
+
+  comment:
+    needs: test
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-py*
+          path: test-results
+
+      - name: Build comment body
+        id: build
+        run: |
+          python3 - <<'EOF'
+          import os, xml.etree.ElementTree as ET, glob
+
+          rows = []
+          overall_pass = True
+
+          for xml_file in sorted(glob.glob("test-results/test-results-py*/test-results.xml")):
+              version = xml_file.split("test-results-py")[1].split("/")[0]
+              suite = ET.parse(xml_file).getroot()
+              # junit XML root may be <testsuites> wrapping <testsuite>
+              if suite.tag == "testsuites":
+                  suite = suite[0]
+              tests   = int(suite.get("tests",    0))
+              failures= int(suite.get("failures", 0))
+              errors  = int(suite.get("errors",   0))
+              skipped = int(suite.get("skipped",  0))
+              passed  = tests - failures - errors - skipped
+              status  = "✅" if failures == 0 and errors == 0 else "❌"
+              if failures > 0 or errors > 0:
+                  overall_pass = False
+              rows.append(f"| Python {version} | {status} | {passed} | {failures + errors} | {skipped} | {tests} |")
+
+          header = "✅ All tests passed" if overall_pass else "❌ Some tests failed"
+          lines = [
+              f"## {header}",
+              "",
+              "| Version | Status | Passed | Failed | Skipped | Total |",
+              "|---------|--------|-------:|-------:|--------:|------:|",
+          ] + rows + ["", "<!-- pytest-ci-comment -->"]
+          body = "\n".join(lines)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              fh.write("body<<COMMENT_EOF\n")
+              fh.write(body + "\n")
+              fh.write("COMMENT_EOF\n")
+          EOF
+
+      - name: Post or update PR comment
+        uses: actions/github-script@v7
+        env:
+          COMMENT_BODY: ${{ steps.build.outputs.body }}
+        with:
+          script: |
+            const marker = '<!-- pytest-ci-comment -->';
+            const body = process.env.COMMENT_BODY;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(
+              c => c.user.login === 'github-actions[bot]' && c.body.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

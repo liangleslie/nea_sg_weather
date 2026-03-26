@@ -1,12 +1,15 @@
 """The NEA Singapore Weather API wrapper."""
 
 from __future__ import annotations
+import asyncio
 import math
 from datetime import datetime, timedelta, timezone, UTC
 import logging
 import statistics
 
 import aiohttp
+
+_REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=10)
 
 from homeassistant.components.weather import (
     ATTR_FORECAST_CONDITION,
@@ -70,14 +73,22 @@ class NeaData:
         self.response = self._resp if self._resp2 == "" else self._resp2
 
     async def fetch_data(self, session: aiohttp.ClientSession, url1: str, url2: str) -> None:
-        """GET response from url"""
-        async with session.get(
-            url1, params=self._params, headers=self._headers
-        ) as resp:
-            self._resp = await resp.json()
-            resp.raise_for_status()
+        """GET response from url, falling back to secondary endpoint on failure."""
+        primary_ok = False
+        try:
+            async with session.get(
+                url1, params=self._params, headers=self._headers, timeout=_REQUEST_TIMEOUT
+            ) as resp:
+                resp.raise_for_status()
+                self._resp = await resp.json()
+                primary_ok = True
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.warning(
+                "%s: Primary request to %s failed: %s",
+                self.__class__.__name__, url1, err,
+            )
 
-            # check if data response is too short
+        if primary_ok:
             _LOGGER.debug(
                 "%s: response received, length: %s",
                 self.__class__.__name__,
@@ -85,24 +96,37 @@ class NeaData:
             )
             if len(str(self._resp)) > 120:
                 self.process_data()
-            else:
-                _LOGGER.warning(
-                    "%s: Response from %s too short.",
-                    self.__class__.__name__,
-                    url1,
+                return
+            _LOGGER.warning(
+                "%s: Response from %s too short.",
+                self.__class__.__name__, url1,
+            )
+
+        if not url2:
+            if not primary_ok:
+                raise aiohttp.ClientError(
+                    f"{self.__class__.__name__}: primary request failed and no secondary endpoint available"
                 )
-                if url2 != "":
-                    _LOGGER.warning(
-                        "%s:  Scraping NEA website for alternative data: %s",
-                        self.__class__.__name__,
-                        url2,
-                    )
-                    async with session.get(
-                        url2, params=self._params2, headers=self._headers
-                    ) as resp2:
-                        self._resp2 = await resp2.json()
-                        resp2.raise_for_status()
-                self.process_secondary_data()
+            self.process_secondary_data()
+            return
+
+        _LOGGER.warning(
+            "%s: Trying secondary endpoint: %s",
+            self.__class__.__name__, url2,
+        )
+        try:
+            async with session.get(
+                url2, params=self._params2, headers=self._headers, timeout=_REQUEST_TIMEOUT
+            ) as resp2:
+                resp2.raise_for_status()
+                self._resp2 = await resp2.json()
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.error(
+                "%s: Secondary request to %s also failed: %s",
+                self.__class__.__name__, url2, err,
+            )
+            raise
+        self.process_secondary_data()
 
     def process_data(self):
         """Function intended to be replaced by subclasses to process API response"""
@@ -513,6 +537,9 @@ class Wind:
                         math.radians(wind_direction_reading["value"] + 180)
                     )
                     result["readings_used"] += 1
+        if result["readings_used"] == 0:
+            _LOGGER.warning("Wind: no matching station pairs found; returning zero wind.")
+            return result
         result["ns_avg"] = result["ns_sum"] / result["readings_used"]
         result["ew_avg"] = result["ew_sum"] / result["readings_used"]
         result["agg_wind_speed"] = math.sqrt(
@@ -547,7 +574,7 @@ class Rain(NeaData):
         # Store rainfall data
         resp_data = self._resp["data"]["readings"][0]["data"]
 
-        self.station_list = RAIN_SENSOR_LIST
+        self.station_list = self._resp["data"]["stations"]
         _current_station_list = [reading["stationId"] for reading in resp_data]
 
         self.data = dict()
