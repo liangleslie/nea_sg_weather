@@ -1,3 +1,7 @@
+v2.7.0
+
+- Updated version to 2.7.0 for HACS compatibility
+
 v2.6.3
 
 - Graceful API failure handling: per-request 10-second timeout; primary endpoint
