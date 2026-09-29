@@ -41,7 +41,9 @@ Entity names follow Home Assistant's convention of device name plus entity name,
 Several `yaml` files are included to help you quickly set up a weather map card on Lovelace UI.
 ![image](https://user-images.githubusercontent.com/57534857/142712510-cabf3214-09c2-4fda-8d43-ff230aebd91c.png)
 
-For the overlays to display properly, you will need the `area`, `region` and `rain` entities activated in the config flow.
+For the overlays to display properly, you will need the `area`, `region` and `rain` entities activated in the config flow (or switched on later with **Reconfigure**).
+
+Besides the rain map and the town and region weather icons, the card can show NEA's own map overlays from the [rain areas page](https://www.nea.gov.sg/weather/rain-areas) — landmarks, townships, MRT stations and expressways — each with its own toggle, and NEA's rain intensity legend below the map.
 
 1. `input_boolean.yaml`: to set up `input_boolean` toggles for the map overlays
 2. `automations.yaml`: automations to manage how the map toggles work

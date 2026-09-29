@@ -1,5 +1,5 @@
 # create rain map lovelace card by including this in your lovelace.yaml:
-# !include custom_component/nea_sg_weather/yaml/lovelace.yaml
+# !include custom_components/nea_sg_weather/yaml/lovelace.yaml
 # or copy and paste this as a manual card in the lovelace editor
 
   type: vertical-stack
@@ -20,7 +20,7 @@
                 width: 100%
                 height: 100%
                 transform: translate(0,-100%)
-                opacity: .4
+                opacity: .5 # as on NEA's rain areas page
               tap_action: none
               hold_action: none
             - type: state-label
@@ -33,6 +33,63 @@
                 height: 100%
                 transform: translate(0%,-15%)
                 color: black
+              tap_action: none
+              hold_action: none
+          # NEA's map overlays (same size as the base map), above the rain layer
+          - type: conditional
+            conditions:
+              - entity: input_boolean.singapore_weather_landmarks
+                state: "on"
+            elements:
+            - type: image
+              image: 'https://www.nea.gov.sg/assets/images/map/Landmarks.png'
+              style:
+                left: 50%
+                top: 50%
+                width: 100%
+                height: 100%
+              tap_action: none
+              hold_action: none
+          - type: conditional
+            conditions:
+              - entity: input_boolean.singapore_weather_townships
+                state: "on"
+            elements:
+            - type: image
+              image: 'https://www.nea.gov.sg/assets/images/map/SG-Township.png'
+              style:
+                left: 50%
+                top: 50%
+                width: 100%
+                height: 100%
+              tap_action: none
+              hold_action: none
+          - type: conditional
+            conditions:
+              - entity: input_boolean.singapore_weather_mrt
+                state: "on"
+            elements:
+            - type: image
+              image: 'https://www.nea.gov.sg/assets/images/map/MRT.png'
+              style:
+                left: 50%
+                top: 50%
+                width: 100%
+                height: 100%
+              tap_action: none
+              hold_action: none
+          - type: conditional
+            conditions:
+              - entity: input_boolean.singapore_weather_expressways
+                state: "on"
+            elements:
+            - type: image
+              image: 'https://www.nea.gov.sg/assets/images/map/expressway.png'
+              style:
+                left: 50%
+                top: 50%
+                width: 100%
+                height: 100%
               tap_action: none
               hold_action: none
           - type: conditional
@@ -311,6 +368,10 @@
                 left: 40%
                 top: 30%
                 transform: none
+    - type: picture
+      image: 'https://www.nea.gov.sg/assets/images/temp/rain-legend.jpg'
+      tap_action:
+        action: none
     - type: entities
       entities:
         - type: buttons
@@ -321,3 +382,13 @@
               name: Towns
             - entity: input_boolean.singapore_weather_region_icons
               name: Regions
+        - type: buttons
+          entities:
+            - entity: input_boolean.singapore_weather_landmarks
+              name: Landmarks
+            - entity: input_boolean.singapore_weather_townships
+              name: Townships
+            - entity: input_boolean.singapore_weather_mrt
+              name: MRT Stations
+            - entity: input_boolean.singapore_weather_expressways
+              name: Expressways
