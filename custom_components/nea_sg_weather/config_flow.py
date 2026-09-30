@@ -122,6 +122,77 @@ class NeaWeatherFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             errors=self._errors,
         )
 
+    async def async_step_reconfigure(
+        self, user_input: dict | None = None
+    ) -> ConfigFlowResult:
+        """Change which entities an existing entry sets up.
+
+        The entry name and sensor prefix are kept as they are: entity IDs are
+        built from them, so changing either would replace every entity.
+        Entities switched off here are removed when the entry reloads (see
+        async_setup_entry in __init__.py and sensor.py).
+        """
+        self._errors = {}
+        entry = self._get_reconfigure_entry()
+        current = entry.data
+        sensors = current.get(CONF_SENSORS, {})
+
+        if user_input is not None:
+            if user_input[CONF_WEATHER] or user_input[CONF_SENSOR]:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={
+                        CONF_WEATHER: user_input[CONF_WEATHER],
+                        CONF_SENSOR: user_input[CONF_SENSOR],
+                        CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
+                        CONF_TIMEOUT: user_input[CONF_TIMEOUT],
+                        CONF_SENSORS: {
+                            # A weather-only entry has no prefix yet; use the
+                            # entry name, as entity IDs elsewhere derive from it.
+                            CONF_PREFIX: sensors.get(CONF_PREFIX, current[CONF_NAME]),
+                            CONF_AREAS: user_input[CONF_AREAS],
+                            CONF_REGION: user_input[CONF_REGION],
+                            CONF_RAIN: user_input[CONF_RAIN],
+                        },
+                    },
+                )
+            self._errors["base"] = "no_entities_selected"
+
+        area_options = ["All"] + AREAS
+        current_areas = [
+            area for area in sensors.get(CONF_AREAS, ["All"]) if area in area_options
+        ]
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_WEATHER, default=current.get(CONF_WEATHER, True)
+                    ): cv.boolean,
+                    vol.Optional(
+                        CONF_SENSOR, default=current.get(CONF_SENSOR, False)
+                    ): cv.boolean,
+                    vol.Optional(
+                        CONF_AREAS, default=current_areas
+                    ): cv.multi_select(dict(zip(area_options, area_options))),
+                    vol.Optional(
+                        CONF_REGION, default=sensors.get(CONF_REGION, False)
+                    ): cv.boolean,
+                    vol.Optional(
+                        CONF_RAIN, default=sensors.get(CONF_RAIN, False)
+                    ): cv.boolean,
+                    vol.Optional(
+                        CONF_SCAN_INTERVAL,
+                        default=current.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                    ): cv.positive_int,
+                    vol.Optional(
+                        CONF_TIMEOUT, default=current.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
+                    ): cv.positive_int,
+                }
+            ),
+            errors=self._errors,
+        )
+
     async def async_step_import(self, user_input: dict | None = None) -> ConfigFlowResult:
         """Handle configuration by yaml file."""
         return await self.async_step_user(user_input)

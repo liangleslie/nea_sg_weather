@@ -1,1 +1,4 @@
 pytest-homeassistant-custom-component==0.13.366
+# Home Assistant's camera component imports turbojpeg; needed to load the
+# rain-map camera platform in tests (same pin as HA's camera manifest).
+PyTurboJPEG==1.8.3

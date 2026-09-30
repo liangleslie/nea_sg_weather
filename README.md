@@ -25,6 +25,10 @@ Follow the integration config flow to set up the following entities:
 - pollutant sensors: per region, the concentrations behind the PSI — PM2.5 and PM10 (24-hour), SO2 (24-hour), O3 and CO (8-hour max) and NO2 (1-hour max). These 30 sensors are created disabled; enable the ones you want from the region's device page
 - `uv_index` sensor: UV index for Singapore
 
+### Changing the configuration
+
+To change which entities an instance sets up (weather entity, areas, region sensors, rain map and sensors, scan interval or timeout), open the integration's menu and choose **Reconfigure**; there is no need to remove and re-add it. The name and sensor prefix cannot be changed there, so existing entity IDs stay the same. Entities you switch off are removed when the integration reloads, and those you keep keep their settings.
+
 ### Devices and entity names
 
 Each configured instance creates a device named after the instance (e.g. "Singapore Weather") holding the weather entity, the UV, area and rainfall sensors and the rain map cameras. When region sensors are enabled, each region gets its own device ("Central Singapore", "Northern Singapore", …) under the main device, holding that region's forecast, PM2.5 and PSI sensors.
@@ -37,7 +41,9 @@ Entity names follow Home Assistant's convention of device name plus entity name,
 Several `yaml` files are included to help you quickly set up a weather map card on Lovelace UI.
 ![image](https://user-images.githubusercontent.com/57534857/142712510-cabf3214-09c2-4fda-8d43-ff230aebd91c.png)
 
-For the overlays to display properly, you will need the `area`, `region` and `rain` entities activated in the config flow.
+For the overlays to display properly, you will need the `area`, `region` and `rain` entities activated in the config flow (or switched on later with **Reconfigure**).
+
+Besides the rain map and the town and region weather icons, the card can show NEA's own map overlays from the [rain areas page](https://www.nea.gov.sg/weather/rain-areas) — landmarks, townships, MRT stations and expressways — each with its own toggle, and NEA's rain intensity legend below the map.
 
 1. `input_boolean.yaml`: to set up `input_boolean` toggles for the map overlays
 2. `automations.yaml`: automations to manage how the map toggles work

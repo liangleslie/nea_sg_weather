@@ -15,8 +15,8 @@ from homeassistant.const import (
     CONF_TIMEOUT,
     CONF_REGION,
 )
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -41,6 +41,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_TIMEOUT,
     DOMAIN,
+    REGIONS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -87,10 +88,44 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
 
-    _platforms = get_platforms(config_entry)["platforms"]
-    await hass.config_entries.async_forward_entry_setups(config_entry, _platforms)
+    _platforms = get_platforms(config_entry)
+    _async_remove_unconfigured(hass, config_entry, device.id, _platforms)
+    await hass.config_entries.async_forward_entry_setups(
+        config_entry, _platforms["platforms"]
+    )
 
     return True
+
+
+@callback
+def _async_remove_unconfigured(
+    hass: HomeAssistant, config_entry: ConfigEntry, device_id: str, platforms: dict
+) -> None:
+    """Remove entities and region devices the configuration no longer sets up.
+
+    Runs on every setup, so options switched off in the reconfigure flow leave
+    no orphans: entities of a platform that is no longer loaded (weather,
+    cameras, or every sensor) are removed here, and the region child devices
+    when region sensors are off. Sensors of a platform that still loads are
+    pruned in sensor.async_setup_entry, which knows the full list.
+    """
+    ent_reg = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(ent_reg, config_entry.entry_id):
+        if entity.domain not in platforms["platforms"]:
+            ent_reg.async_remove(entity.entity_id)
+            _LOGGER.debug("Removed entity no longer configured: %s", entity.entity_id)
+
+    if CONF_REGION not in platforms["entities"]:
+        region_ids = {
+            (DOMAIN, f"{config_entry.entry_id}_{region.lower()}") for region in REGIONS
+        }
+        dev_reg = dr.async_get(hass)
+        # Region devices are children of the main device, which
+        # async_entries_for_config_entry does not return.
+        for device in dr.async_entries_for_parent_device(dev_reg, device_id):
+            if device.identifiers & region_ids:
+                dev_reg.async_remove_device(device.id)
+                _LOGGER.debug("Removed region device no longer configured: %s", device.name)
 
 
 async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:

@@ -152,6 +152,17 @@ async def async_setup_entry(
             for region in REGIONS
         ]
 
+    # Remove sensors this configuration no longer creates (areas dropped, or
+    # regions or rain switched off in the reconfigure flow) so they do not stay
+    # behind as orphans. Rain stations that disappear at runtime are handled by
+    # the listener above.
+    keep_unique_ids = {entity.unique_id for entity in entities_list}
+    ent_reg = er.async_get(hass)
+    for reg_entry in er.async_entries_for_config_entry(ent_reg, entry_id):
+        if reg_entry.domain == "sensor" and reg_entry.unique_id not in keep_unique_ids:
+            ent_reg.async_remove(reg_entry.entity_id)
+            _LOGGER.debug("Removed sensor no longer configured: %s", reg_entry.entity_id)
+
     async_add_entities(entities_list)
 
 

@@ -21,11 +21,27 @@
           "region": "Add regional weather sensor entities?",
           "rain": "Add rain map sensors entity?"
         }
+      },
+      "reconfigure": {
+        "title": "Change what NEA Singapore Weather sets up",
+        "description": "Choose which entities this entry creates. The entity name and sensor prefix stay as they are, so existing entity IDs do not change. Anything you switch off is removed when the integration reloads.\nChoosing \"All\" creates sensors for all 47 areas tracked by NEA.",
+        "data": {
+          "weather": "Set up main weather entity?",
+          "sensor": "Set up additional sensor entities?",
+          "areas": "Select areas in Singapore to create sensor entities",
+          "region": "Add regional weather sensor entities?",
+          "rain": "Add rain map sensors entity?",
+          "scan_interval": "Scan Interval",
+          "timeout": "Timeout"
+        }
       }
     },
     "error": {
       "already_configured": "Integration with same name already registered, please remove existing configuration and try again",
       "no_entities_selected": "No entities selected, please choose an entity type to register and try again"
+    },
+    "abort": {
+      "reconfigure_successful": "The configuration was updated and the integration reloaded."
     }
   },
   "device": {

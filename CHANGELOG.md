@@ -1,5 +1,15 @@
 Unreleased
 
+- Added a **Reconfigure** option to change which entities an instance sets
+  up (weather entity, areas, region sensors, rain, scan interval, timeout)
+  without removing and re-adding it. The name and prefix are kept, so entity
+  IDs do not change
+- Entities and region devices switched off are removed when the integration
+  reloads instead of staying behind as orphans
+- The example weather map card (`yaml/lovelace.yaml`) can show NEA's
+  landmarks, townships, MRT and expressway overlays and the rain intensity
+  legend, with toggles in `yaml/input_boolean.yaml`; the rain layer uses
+  NEA's opacity (0.5)
 - Added pollutant concentration sensors per region (PM2.5 and PM10 24-hour,
   SO2 24-hour, O3 and CO 8-hour max, NO2 1-hour max) from the PSI response,
   so the values get history and statistics. Created disabled by default

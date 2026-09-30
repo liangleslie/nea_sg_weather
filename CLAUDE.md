@@ -132,6 +132,32 @@ Rain station entities are built from the live API response (`Rain.station_list`)
 
 `NeaRainSensor.available` returns `False` when the station ID is absent from `coordinator.data.rain.data`, preventing `KeyError` crashes in the brief window between a station disappearing from the API and its entity being removed.
 
+## Reconfiguring an Entry
+
+`config_flow.async_step_reconfigure` shows the setup choices (weather, sensor,
+areas, region, rain, scan interval, timeout) prefilled from `entry.data` and
+saves them with `async_update_reload_and_abort`. The entry name and sensor
+prefix are never changed there: entity IDs are built from them. A weather-only
+entry has no prefix yet, so it gets the entry name.
+
+Whatever the new configuration no longer sets up is removed on setup, so the
+reload after a reconfigure leaves no orphans:
+
+- `__init__._async_remove_unconfigured` removes the entry's entities whose
+  platform is not loaded any more (e.g. the weather entity, the cameras when
+  rain is off, every sensor when sensors are off), and the region child
+  devices when region sensors are off. Child devices are found with
+  `dr.async_entries_for_parent_device` on the main device:
+  `async_entries_for_config_entry` does not return them, and
+  `DeviceRegistry.async_get_device` is deprecated in HA 2026.9.
+- `sensor.async_setup_entry` removes the entry's sensor entities whose unique
+  ID is not among the sensors it is about to add (areas dropped, regions or
+  rain switched off). Disabled-by-default sensors that are still configured
+  are in that list, so a reload without changes removes nothing.
+
+`ha_tests/test_reconfigure.py` covers both, with its own API fixture whose
+2-hour forecast lists all 47 areas (the shared `mock_nea_api` lists three).
+
 ## Which Data Objects Get Polled
 
 `NeaWeatherData.async_update` in `__init__.py` only fetches the endpoints the
@@ -175,6 +201,7 @@ and every pull request.
 The HA integration test workflow (`.github/workflows/ha-test.yml`) uses
 `requirements-ha-test.txt`, which pins `pytest-homeassistant-custom-component`
 to an exact version (and with it the Home Assistant release the tests boot).
-Bump the pin to test against a newer HA. The `ha_tests/` fixtures mock the NEA
+Bump the pin to test against a newer HA. It also installs `PyTurboJPEG`
+(HA's camera component imports it), so tests can load the rain-map cameras. The `ha_tests/` fixtures mock the NEA
 API with HA's `aioclient_mock`, which patches the shared session returned by
 `async_get_clientsession()`.
