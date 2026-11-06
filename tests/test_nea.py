@@ -896,3 +896,142 @@ class TestWindCalcStatusZeroReadings:
         assert result["readings_used"] == 0
         assert result["agg_wind_speed"] == 0
         assert result["agg_wind_direction"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Closest Station & Area Resolution (Zero Hardcoded Coordinates)
+# ---------------------------------------------------------------------------
+
+class TestClosestStationAndAreaResolution:
+    """Verify closest-station / closest-area resolution using live API metadata."""
+
+    BUCKLEY_LAT = 1.318114
+    BUCKLEY_LON = 103.840456
+
+    def test_temperature_uses_closest_station_from_live_metadata(self):
+        t = Temperature(self.BUCKLEY_LAT, self.BUCKLEY_LON)
+        t._resp = {
+            "data": {
+                "stations": [
+                    {
+                        "id": "S111",
+                        "name": "Scotts Road",
+                        "location": {"latitude": 1.31055, "longitude": 103.8365},
+                    },
+                    {
+                        "id": "S60",
+                        "name": "Sentosa",
+                        "location": {"latitude": 1.25, "longitude": 103.8279},
+                    },
+                ],
+                "readings": [
+                    {
+                        "timestamp": "2026-11-06T18:00:00+08:00",
+                        "data": [
+                            {"stationId": "S111", "value": 25.2},
+                            {"stationId": "S60", "value": 29.8},
+                        ],
+                    }
+                ],
+            }
+        }
+        t.process_data()
+        assert t.temp_avg == pytest.approx(25.2)
+        assert t.island_temp_avg == pytest.approx(27.5)
+        assert t.station_id == "S111"
+        assert t.station_name == "Scotts Road"
+        assert t.station_latitude == pytest.approx(1.31055)
+        assert t.station_longitude == pytest.approx(103.8365)
+        assert t.google_maps_url == "https://www.google.com/maps/search/?api=1&query=1.31055,103.8365"
+
+    def test_temperature_falls_back_to_second_closest_if_closest_offline(self):
+        t = Temperature(self.BUCKLEY_LAT, self.BUCKLEY_LON)
+        t._resp = {
+            "data": {
+                "stations": [
+                    {
+                        "id": "S111",
+                        "name": "Scotts Road",
+                        "location": {"latitude": 1.31055, "longitude": 103.8365},
+                    },
+                    {
+                        "id": "S43",
+                        "name": "Kim Chuan Road",
+                        "location": {"latitude": 1.3399, "longitude": 103.8878},
+                    },
+                ],
+                "readings": [
+                    {
+                        "timestamp": "2026-11-06T18:00:00+08:00",
+                        "data": [
+                            {"stationId": "S43", "value": 26.1},
+                        ],
+                    }
+                ],
+            }
+        }
+        t.process_data()
+        assert t.temp_avg == pytest.approx(26.1)
+        assert t.station_id == "S43"
+        assert t.station_name == "Kim Chuan Road"
+
+    def test_forecast2hr_uses_closest_area_from_live_metadata(self):
+        f = Forecast2hr(self.BUCKLEY_LAT, self.BUCKLEY_LON)
+        f._resp = {
+            "data": {
+                "items": [
+                    {
+                        "timestamp": "2026-11-06T18:00:00+08:00",
+                        "forecasts": [
+                            {"area": "Novena", "forecast": "Moderate Rain"},
+                            {"area": "Jurong West", "forecast": "Partly Cloudy (Day)"},
+                            {"area": "Tuas", "forecast": "Partly Cloudy (Day)"},
+                        ],
+                    }
+                ],
+                "area_metadata": [
+                    {"name": "Novena", "label_location": {"latitude": "1.327", "longitude": "103.826"}},
+                    {"name": "Jurong West", "label_location": {"latitude": "1.34039", "longitude": "103.705"}},
+                    {"name": "Tuas", "label_location": {"latitude": "1.294947", "longitude": "103.635"}},
+                ],
+            }
+        }
+        f.process_data()
+        assert f.current_condition == "Moderate Rain"
+        assert f.island_condition == "Partly Cloudy (Day)"
+        assert f.closest_area == "Novena"
+
+    def test_psi_and_pm25_resolve_closest_region_from_region_metadata(self):
+        region_meta = [
+            {"name": "north", "labelLocation": {"latitude": 1.41803, "longitude": 103.82}},
+            {"name": "south", "labelLocation": {"latitude": 1.29587, "longitude": 103.82}},
+            {"name": "east", "labelLocation": {"latitude": 1.35735, "longitude": 103.94}},
+            {"name": "west", "labelLocation": {"latitude": 1.35735, "longitude": 103.7}},
+            {"name": "central", "labelLocation": {"latitude": 1.35735, "longitude": 103.82}},
+        ]
+        p = PSI(self.BUCKLEY_LAT, self.BUCKLEY_LON)
+        p._resp = {
+            "data": {
+                "regionMetadata": region_meta,
+                "items": [
+                    {
+                        "timestamp": "2026-11-06T21:00:00+08:00",
+                        "readings": {
+                            "psi_twenty_four_hourly": {
+                                "north": 50,
+                                "south": 54,
+                                "east": 58,
+                                "west": 61,
+                                "central": 52,
+                            }
+                        },
+                    }
+                ],
+            }
+        }
+        p.process_data()
+        assert p.closest_region == "South"
+        assert p.closest_value == 54
+        assert p.closest_distance_km == pytest.approx(3.36, abs=0.2)
+
+

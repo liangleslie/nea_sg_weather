@@ -28,12 +28,14 @@ from .entity import main_device_info, region_device_info
 from .const import (
     AREAS,
     CONF_AREAS,
+    CONF_CLOSEST,
     CONF_RAIN,
     DOMAIN,
     FORECAST_ICON_BASE_URL,
     FORECAST_ICON_MAP_CONDITION,
     POLLUTANT_READINGS,
     REGIONS,
+    google_maps_url,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -51,14 +53,20 @@ async def async_setup_entry(
     entry_id = config_entry.entry_id
 
     # add area sensor entities
-    if "All" in config_entry.data[CONF_SENSORS][CONF_AREAS]:
+    configured_areas = config_entry.data[CONF_SENSORS][CONF_AREAS]
+    if "All" in configured_areas:
+        area_targets = [CONF_CLOSEST] + list(AREAS)
+        if CONF_CLOSEST not in configured_areas:
+            # Preserve exact 47-area behavior when "All" is used without "Closest"
+            area_targets = list(AREAS)
         entities_list = [
-            NeaAreaSensor(coordinator, config_entry.data, area, entry_id) for area in AREAS
+            NeaAreaSensor(coordinator, config_entry.data, area, entry_id)
+            for area in area_targets
         ]
     else:
         entities_list = [
             NeaAreaSensor(coordinator, config_entry.data, area, entry_id)
-            for area in list(set(config_entry.data[CONF_SENSORS][CONF_AREAS]))
+            for area in list(set(configured_areas))
         ]
 
     # add region sensor entities
@@ -129,6 +137,11 @@ async def async_setup_entry(
     entities_list += [
         NeaUVSensor(coordinator, config_entry.data, entry_id)
     ]
+
+    if CONF_CLOSEST in configured_areas:
+        entities_list += [
+            NeaClosestPSISensor(coordinator, config_entry.data, entry_id),
+        ]
 
     # add pm25 sensor entities
     if config_entry.data[CONF_SENSORS][CONF_REGION]:
@@ -205,24 +218,81 @@ class NeaAreaSensor(CoordinatorEntity, SensorEntity):
     @property
     def entity_picture(self):
         """Return the entity picture url from NEA to use in the frontend"""
-        return FORECAST_ICON_BASE_URL + FORECAST_ICON_MAP_CONDITION.get(self.state, "NA") + ".png"
+        condition = (
+            self.coordinator.data.forecast2hr.current_condition
+            if self._area == CONF_CLOSEST
+            else self.state
+        )
+        return (
+            FORECAST_ICON_BASE_URL
+            + FORECAST_ICON_MAP_CONDITION.get(condition, "NA")
+            + ".png"
+        )
 
     @property
     def state(self):
-        """Return the weather condition."""
+        """Return the weather condition (or closest weather station name for 'Closest')."""
+        if self._area == CONF_CLOSEST:
+            temp = getattr(self.coordinator.data, "temperature", None)
+            f2h = self.coordinator.data.forecast2hr
+            return (
+                getattr(temp, "station_name", None)
+                or getattr(f2h, "closest_area", None)
+                or CONF_CLOSEST
+            )
         return self.coordinator.data.forecast2hr.area_forecast[self._area]["forecast"]
 
     @property
     def extra_state_attributes(self) -> dict:
         """Return dict of additional properties to attach to sensors."""
+        if self._area == CONF_CLOSEST:
+            temp = getattr(self.coordinator.data, "temperature", None)
+            hum = getattr(self.coordinator.data, "humidity", None)
+            wind = getattr(self.coordinator.data, "wind", None)
+            psi = getattr(self.coordinator.data, "psi", None)
+            pm25 = getattr(self.coordinator.data, "pm25", None)
+            f2h = self.coordinator.data.forecast2hr
+            closest_area = getattr(f2h, "closest_area", None)
+            area_loc = (
+                f2h.area_forecast.get(closest_area, {}).get("location", {})
+                if closest_area
+                else {}
+            )
+            lat = getattr(temp, "station_latitude", None) or area_loc.get("latitude")
+            lon = getattr(temp, "station_longitude", None) or area_loc.get("longitude")
+            temp_val = getattr(temp, "temp_avg", None)
+            hum_val = getattr(hum, "humd_avg", None)
+            wind_spd = getattr(wind, "wind_speed_avg", None)
+            wind_dir = getattr(wind, "wind_dir_avg", None)
+            attrs: dict[str, Any] = {
+                "Updated at": getattr(temp, "timestamp", None) or f2h.timestamp,
+                "station_id": getattr(temp, "station_id", None),
+                "station_name": getattr(temp, "station_name", None) or closest_area,
+                "forecast_area": closest_area,
+                "forecast": f2h.current_condition,
+                "temperature": round(temp_val, 1) if isinstance(temp_val, (int, float)) else None,
+                "humidity": round(hum_val, 1) if isinstance(hum_val, (int, float)) else None,
+                "wind_speed_kn": round(wind_spd, 1) if isinstance(wind_spd, (int, float)) else None,
+                "wind_speed_kmh": round(wind_spd * 1.852, 1) if isinstance(wind_spd, (int, float)) else None,
+                "wind_bearing": round(wind_dir) if isinstance(wind_dir, (int, float)) else None,
+                "psi_24h": getattr(psi, "closest_value", None),
+                "psi_region": getattr(psi, "closest_region", None),
+                "pm25_1h": getattr(pm25, "closest_value", None),
+                "distance_km": getattr(temp, "station_distance_km", None)
+                or getattr(f2h, "closest_area_distance_km", None),
+            }
+            if lat is not None and lon is not None:
+                attrs["latitude"] = lat
+                attrs["longitude"] = lon
+                attrs["google_maps_url"] = google_maps_url(lat, lon)
+            return attrs
+
+        loc = self.coordinator.data.forecast2hr.area_forecast[self._area]["location"]
         return {
             "Updated at": self.coordinator.data.forecast2hr.timestamp,
-            "latitude": self.coordinator.data.forecast2hr.area_forecast[self._area][
-                "location"
-            ]["latitude"],
-            "longitude": self.coordinator.data.forecast2hr.area_forecast[self._area][
-                "location"
-            ]["longitude"],
+            "latitude": loc["latitude"],
+            "longitude": loc["longitude"],
+            "google_maps_url": google_maps_url(loc["latitude"], loc["longitude"]),
         }
 
 
@@ -610,3 +680,65 @@ class NeaUVSensor(CoordinatorEntity, SensorEntity):
         return {
             "Updated at": self.coordinator.data.uvindex.timestamp,
         }
+
+
+class NeaClosestPSISensor(CoordinatorEntity, SensorEntity):
+    """Implementation of a NEA 24-hour PSI sensor for the closest region."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "psi_24h"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_device_class = SensorDeviceClass.AQI
+    _attr_icon = "mdi:weather-hazy"
+
+    def __init__(
+        self,
+        coordinator,
+        config: MappingProxyType[str, Any],
+        entry_id: str,
+    ) -> None:
+        """Initialise closest PSI sensor on the main device."""
+        super().__init__(coordinator)
+        self.coordinator = coordinator
+        self._platform = "sensor"
+        self._prefix = config[CONF_SENSORS][CONF_PREFIX]
+        self._entry_id = entry_id
+        self._attr_device_info = main_device_info(entry_id)
+        self.entity_id = (
+            (self._platform + "." + self._prefix + "_closest_psi")
+            .lower()
+            .replace(" ", "_")
+        )
+
+    @property
+    def unique_id(self):
+        """Return the unique ID."""
+        return self._prefix + "_closest_psi"
+
+    @property
+    def native_value(self):
+        """Return the 24-hour PSI reading for the closest region."""
+        psi = self.coordinator.data.psi
+        if getattr(psi, "closest_value", None) is not None:
+            return psi.closest_value
+        return psi.data.get("central")
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return dict of additional properties to attach to sensors."""
+        psi = self.coordinator.data.psi
+        pm25 = getattr(self.coordinator.data, "pm25", None)
+        region_name = getattr(psi, "closest_region", None) or "Central"
+        region_key = region_name.lower()
+        attributes: dict[str, Any] = {
+            "Updated at": psi.timestamp,
+            "region": region_name,
+            "distance_km": getattr(psi, "closest_distance_km", None),
+            "PM2.5 (1h)": getattr(pm25, "closest_value", None)
+            or (pm25.data.get(region_key) if pm25 and pm25.data else None),
+            "PM2.5 (24h)": psi.pm25_24h.get(region_key),
+        }
+        for pollutant, values in psi.sub_indices.items():
+            attributes[pollutant.upper() + " sub-index"] = values.get(region_key)
+        return attributes
+

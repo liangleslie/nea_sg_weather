@@ -10,13 +10,19 @@ Home Assistant Integration to get current weather information directly from Data
 
 ## Installation
 
-Add this integration to Home Assistant using HACS, or copy everything in `custom_components/nea_sg_weather` to your `custom_components` folder in your Home Assistant `config` folder. 
+Install this integration via **Home Assistant Marketplace** (Home Assistant 2026.11+) or **HACS**, or manually copy everything in `custom_components/nea_sg_weather` into the `custom_components/nea_sg_weather` directory inside your Home Assistant configuration folder (`/config/custom_components/nea_sg_weather` or `/homeassistant/custom_components/nea_sg_weather`).
 
 Requires Home Assistant 2026.9 or newer.
 
-Follow the integration config flow to set up the following entities:
-- `weather`: weather entity with 4 day forecasts
-- `area` (town) sensors: current weather conditions for up to 47 areas/towns in Singapore
+Follow the integration config flow (**Settings → Devices & services → Add integration → NEA Singapore Weather**) to set up the following entities:
+- `weather`: primary weather entity with 4-day daily forecasts. Temperature, humidity, wind, and current 2-hour condition are resolved automatically from the **closest active NEA weather station and forecast area** to your Home Assistant's configured home coordinates (`Settings → System → General`), with island-wide fallback if coordinates are not set.
+- `closest` sensor (`sensor.<prefix>_closest`): selected by default in the sensor setup flow to avoid creating all 47 town sensors. Carries the **name of the closest active NEA weather station** as its state, along with `latitude`, `longitude`, `distance_km`, `forecast_area`, `forecast`, `temperature`, `humidity`, `wind_speed_kmh`, `wind_bearing`, and a direct `google_maps_url` link to the station's position, plus a paired `sensor.<prefix>_closest_psi` entity exposing 24-hour PSI and 1-hour PM2.5 for the closest NEA region.
+
+<p align="center">
+  <img src="docs/images/local-weather-card.png" width="380" alt="NEA Forecast (Pan-Singapore) and Local Weather card showing closest station readings and Google Maps pin link" />
+</p>
+
+- `area` (town) sensors: current weather conditions for specific areas/towns (or all 47 areas if `"All"` is explicitly selected) in Singapore.
 - `region` sensors: 24 hour weather condition forecast for North/South/East/West/Central regions of Singapore
 - `rain` camera: 2 camera entities for static and animated rain map overlays updated every 5 minutes from NEA
 - `rain` sensors: one rainfall sensor per active NEA station, fetched live from the API — stations are added and removed automatically as the API changes

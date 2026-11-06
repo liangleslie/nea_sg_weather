@@ -1,4 +1,8 @@
 """New config variable"""
+from __future__ import annotations
+
+import math
+
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
@@ -16,6 +20,7 @@ from homeassistant.components.weather import (
 )
 
 CONF_AREAS = "areas"
+CONF_CLOSEST = "Closest"
 CONF_RAIN = "rain"
 CONF_SENSOR = "sensor"
 CONF_WEATHER = "weather"
@@ -554,6 +559,30 @@ RAIN_SENSOR_LIST = [
 ]
 
 REGIONS = ["West", "East", "Central", "South", "North"]
+
+
+def is_valid_coordinates(lat: float | None, lon: float | None) -> bool:
+    """Return True if (lat, lon) are valid non-zero numeric coordinates."""
+    if isinstance(lat, bool) or isinstance(lon, bool):
+        return False
+    if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+        return False
+    return not (float(lat) == 0.0 and float(lon) == 0.0)
+
+
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Return Great-Circle Haversine distance in kilometers using stdlib math."""
+    radius_km = 6371.0
+    p1, p2 = math.radians(float(lat1)), math.radians(float(lat2))
+    dp = math.radians(float(lat2) - float(lat1))
+    dl = math.radians(float(lon2) - float(lon1))
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * radius_km * math.asin(math.sqrt(a))
+
+
+def google_maps_url(lat: float, lon: float) -> str:
+    """Return a Google Maps pin URL for the given coordinates."""
+    return f"https://www.google.com/maps/search/?api=1&query={float(lat)},{float(lon)}"
 
 # Pollutant concentrations in the PSI API response, keyed by the pollutant's
 # short name (used as the sensor's translation key and in its entity ID).

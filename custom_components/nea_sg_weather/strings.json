@@ -14,7 +14,7 @@
       },
       "sensor": {
         "title": "Set up weather sensor entities",
-        "description": "Define a name prefix and choose the areas you want to create weather sensors for.\nChoosing \"All\" will create all 47 sensor entities for all areas tracked by NEA.",
+        "description": "Define a name prefix and choose the areas you want to create weather sensors for.\n\"Closest\" is selected by default and creates a persistent sensor (`sensor.<prefix>_closest`) tracking your nearest NEA weather station based on Home Assistant's home coordinates. Choosing \"All\" will create all 47 sensor entities for all areas tracked by NEA.",
         "data": {
           "prefix": "Prefix for sensor entities' names",
           "areas": "Select areas in Singapore to create sensor entities",
@@ -24,7 +24,7 @@
       },
       "reconfigure": {
         "title": "Change what NEA Singapore Weather sets up",
-        "description": "Choose which entities this entry creates. The entity name and sensor prefix stay as they are, so existing entity IDs do not change. Anything you switch off is removed when the integration reloads.\nChoosing \"All\" creates sensors for all 47 areas tracked by NEA.",
+        "description": "Choose which entities this entry creates. The entity name and sensor prefix stay as they are, so existing entity IDs do not change. Anything you switch off is removed when the integration reloads.\nChoosing \"Closest\" tracks only your nearest NEA weather station; choosing \"All\" creates sensors for all 47 areas tracked by NEA.",
         "data": {
           "weather": "Set up main weather entity?",
           "sensor": "Set up additional sensor entities?",
