@@ -161,6 +161,34 @@ class TestNeaAreaSensor:
         assert sensor._attr_has_entity_name is True
         assert sensor._attr_device_info == {"identifiers": {(DOMAIN, "entry1")}}
 
+    def test_closest_sensor_carries_station_name_and_google_maps_url(self):
+        coord = _make_coordinator(area="Novena", area_forecast_value="Moderate Rain")
+        coord.data.forecast2hr.current_condition = "Moderate Rain"
+        coord.data.forecast2hr.closest_area = "Novena"
+        coord.data.forecast2hr.closest_area_distance_km = 1.89
+        coord.data.temperature.station_id = "S111"
+        coord.data.temperature.station_name = "Scotts Road"
+        coord.data.temperature.station_latitude = 1.31055
+        coord.data.temperature.station_longitude = 103.8365
+        coord.data.temperature.station_distance_km = 0.94
+        coord.data.temperature.timestamp = "2026-11-06T18:30:00+08:00"
+
+        sensor = NeaAreaSensor(coord, _make_config("nea"), "Closest", "entry1")
+        assert sensor.entity_id == "sensor.nea_closest"
+        assert sensor.unique_id == "nea Closest"
+        assert sensor.name == "Closest"
+        assert sensor.state == "Scotts Road"
+        assert sensor.entity_picture == FORECAST_ICON_BASE_URL + "RA.png"
+
+        attrs = sensor.extra_state_attributes
+        assert attrs["station_id"] == "S111"
+        assert attrs["station_name"] == "Scotts Road"
+        assert attrs["forecast_area"] == "Novena"
+        assert attrs["forecast"] == "Moderate Rain"
+        assert attrs["latitude"] == pytest.approx(1.31055)
+        assert attrs["longitude"] == pytest.approx(103.8365)
+        assert attrs["google_maps_url"] == "https://www.google.com/maps/search/?api=1&query=1.31055,103.8365"
+
 
 # ---------------------------------------------------------------------------
 # NeaRegionSensor

@@ -28,6 +28,9 @@ from .const import (
     FORECAST_ICON_MAP_CONDITION,
     HEADERS,
     RAIN_SENSOR_LIST,
+    google_maps_url,
+    haversine_km,
+    is_valid_coordinates,
 )
 
 INV_FORECAST_ICON_MAP_CONDITION = dict()
@@ -48,6 +51,97 @@ def list_mean(values):
             sum_values += value["value"]
             i += 1
     return round(sum_values / i, 2)
+
+
+def _find_closest_station_reading(
+    stations: list[dict],
+    readings: list[dict],
+    latitude: float | None,
+    longitude: float | None,
+) -> dict | None:
+    """Return metadata & value for the closest active station in the live API payload."""
+    if not is_valid_coordinates(latitude, longitude) or not stations or not readings:
+        return None
+
+    reading_map = {
+        r.get("stationId"): r.get("value")
+        for r in readings
+        if r.get("stationId") and isinstance(r.get("value"), (int, float))
+    }
+    if not reading_map:
+        return None
+
+    candidates: list[tuple[float, dict]] = []
+    for station in stations:
+        sid = station.get("id") or station.get("deviceId")
+        if sid not in reading_map:
+            continue
+        loc = station.get("location", {})
+        slat = loc.get("latitude")
+        slon = loc.get("longitude")
+        if not is_valid_coordinates(slat, slon):
+            continue
+        dist = haversine_km(float(latitude), float(longitude), float(slat), float(slon))
+        candidates.append(
+            (
+                dist,
+                {
+                    "value": float(reading_map[sid]),
+                    "station_id": sid,
+                    "station_name": station.get("name", sid),
+                    "latitude": float(slat),
+                    "longitude": float(slon),
+                    "distance_km": round(dist, 2),
+                    "google_maps_url": google_maps_url(float(slat), float(slon)),
+                },
+            )
+        )
+
+    if not candidates:
+        return None
+
+    return min(candidates, key=lambda item: item[0])[1]
+
+
+def _find_closest_region(
+    region_metadata: list[dict],
+    readings_dict: dict[str, Any],
+    latitude: float | None,
+    longitude: float | None,
+) -> dict | None:
+    """Return closest region metadata & value using live regionMetadata from NEA API."""
+    if not is_valid_coordinates(latitude, longitude) or not region_metadata or not readings_dict:
+        return None
+
+    candidates: list[tuple[float, dict]] = []
+    for item in region_metadata:
+        rname = str(item.get("name", "")).lower()
+        if rname not in readings_dict or not isinstance(readings_dict[rname], (int, float)):
+            continue
+        loc = item.get("labelLocation", {})
+        rlat = loc.get("latitude")
+        rlon = loc.get("longitude")
+        if not is_valid_coordinates(rlat, rlon):
+            continue
+        dist = haversine_km(float(latitude), float(longitude), float(rlat), float(rlon))
+        candidates.append(
+            (
+                dist,
+                {
+                    "region": rname.capitalize(),
+                    "region_key": rname,
+                    "value": readings_dict[rname],
+                    "latitude": float(rlat),
+                    "longitude": float(rlon),
+                    "distance_km": round(dist, 2),
+                },
+            )
+        )
+
+    if not candidates:
+        return None
+
+    return min(candidates, key=lambda item: item[0])[1]
 
 
 class NeaData:
@@ -141,11 +235,18 @@ class NeaData:
 class Forecast2hr(NeaData):
     """Class for _forecast2hr_ data"""
 
-    def __init__(self):
+    def __init__(
+        self, latitude: float | None = None, longitude: float | None = None
+    ) -> None:
         self.timestamp = ""
         self.current_condition = ""
+        self.island_condition = ""
+        self.closest_area: str | None = None
+        self.closest_area_distance_km: float | None = None
         self.area_forecast = dict()
         self.metadata = list()
+        self.latitude = latitude
+        self.longitude = longitude
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["forecast2hr"],
@@ -162,10 +263,11 @@ class Forecast2hr(NeaData):
         _current_condition_list = [
             item["forecast"] for item in self._resp["data"]["items"][0]["forecasts"]
         ]
-        self.current_condition = max(
+        self.island_condition = max(
             set(_current_condition_list),
             key=_current_condition_list.count,
         )
+        self.current_condition = self.island_condition
 
         # Store area forecast data
         self.area_forecast = {
@@ -178,6 +280,29 @@ class Forecast2hr(NeaData):
             }
             for i in range(len(self._resp["data"]["items"][0]["forecasts"]))
         }
+
+        if is_valid_coordinates(self.latitude, self.longitude) and self.area_forecast:
+            closest_name = min(
+                self.area_forecast,
+                key=lambda name: haversine_km(
+                    float(self.latitude),
+                    float(self.longitude),
+                    self.area_forecast[name]["location"]["latitude"],
+                    self.area_forecast[name]["location"]["longitude"],
+                ),
+            )
+            loc = self.area_forecast[closest_name]["location"]
+            self.closest_area = closest_name
+            self.closest_area_distance_km = round(
+                haversine_km(
+                    float(self.latitude),
+                    float(self.longitude),
+                    loc["latitude"],
+                    loc["longitude"],
+                ),
+                2,
+            )
+            self.current_condition = self.area_forecast[closest_name]["forecast"]
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
@@ -333,9 +458,20 @@ class Forecast4day(NeaData):
 class Temperature(NeaData):
     """Class for _temperature_ data"""
 
-    def __init__(self):
+    def __init__(
+        self, latitude: float | None = None, longitude: float | None = None
+    ) -> None:
         self.timestamp = ""
         self.temp_avg = 0
+        self.island_temp_avg = 0
+        self.station_id: str | None = None
+        self.station_name: str | None = None
+        self.station_latitude: float | None = None
+        self.station_longitude: float | None = None
+        self.station_distance_km: float | None = None
+        self.google_maps_url: str | None = None
+        self.latitude = latitude
+        self.longitude = longitude
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["temperature"],
@@ -344,9 +480,27 @@ class Temperature(NeaData):
 
     def process_data(self):
         # Update data timestamp
-        self.timestamp = self._resp["data"]["readings"][0]["timestamp"]
+        readings = self._resp["data"]["readings"][0]
+        self.timestamp = readings["timestamp"]
+        data_points = readings["data"]
 
-        self.temp_avg = statistics.fmean([x["value"] for x in self._resp["data"]["readings"][0]["data"]])
+        self.island_temp_avg = statistics.fmean([x["value"] for x in data_points])
+        self.temp_avg = self.island_temp_avg
+
+        closest = _find_closest_station_reading(
+            self._resp["data"].get("stations", []),
+            data_points,
+            self.latitude,
+            self.longitude,
+        )
+        if closest is not None:
+            self.temp_avg = closest["value"]
+            self.station_id = closest["station_id"]
+            self.station_name = closest["station_name"]
+            self.station_latitude = closest["latitude"]
+            self.station_longitude = closest["longitude"]
+            self.station_distance_km = closest["distance_km"]
+            self.google_maps_url = closest["google_maps_url"]
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
@@ -359,9 +513,20 @@ class Temperature(NeaData):
 class Humidity(NeaData):
     """Class for _humidity_ data"""
 
-    def __init__(self):
+    def __init__(
+        self, latitude: float | None = None, longitude: float | None = None
+    ) -> None:
         self.timestamp = ""
         self.humd_avg = 0
+        self.island_humd_avg = 0
+        self.station_id: str | None = None
+        self.station_name: str | None = None
+        self.station_latitude: float | None = None
+        self.station_longitude: float | None = None
+        self.station_distance_km: float | None = None
+        self.google_maps_url: str | None = None
+        self.latitude = latitude
+        self.longitude = longitude
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["humidity"],
@@ -370,12 +535,31 @@ class Humidity(NeaData):
 
     def process_data(self):
         # Update data timestamp
-        self.timestamp = self._resp["data"]["readings"][0]["timestamp"]
+        readings = self._resp["data"]["readings"][0]
+        self.timestamp = readings["timestamp"]
+        data_points = readings["data"]
 
         try:
-            self.humd_avg = statistics.fmean([x["value"] for x in self._resp["data"]["readings"][0]["data"]])
+            self.island_humd_avg = statistics.fmean([x["value"] for x in data_points])
         except statistics.StatisticsError:
-            self.humd_avg = 0
+            self.island_humd_avg = 0
+        self.humd_avg = self.island_humd_avg
+
+        closest = _find_closest_station_reading(
+            self._resp["data"].get("stations", []),
+            data_points,
+            self.latitude,
+            self.longitude,
+        )
+        if closest is not None:
+            self.humd_avg = closest["value"]
+            self.station_id = closest["station_id"]
+            self.station_name = closest["station_name"]
+            self.station_latitude = closest["latitude"]
+            self.station_longitude = closest["longitude"]
+            self.station_distance_km = closest["distance_km"]
+            self.google_maps_url = closest["google_maps_url"]
+
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
@@ -413,12 +597,19 @@ class WindDirection(NeaData):
 class PSI(NeaData):
     """Class for _PSI_ (Pollutant Standards Index) data"""
 
-    def __init__(self):
+    def __init__(
+        self, latitude: float | None = None, longitude: float | None = None
+    ) -> None:
         self.timestamp = ""
         self.data = dict()
         self.pm25_24h = dict()
         self.sub_indices = dict()
         self.concentrations = dict()
+        self.closest_region: str | None = None
+        self.closest_value: float | int | None = None
+        self.closest_distance_km: float | None = None
+        self.latitude = latitude
+        self.longitude = longitude
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["psi"],
@@ -451,6 +642,17 @@ class PSI(NeaData):
             for pollutant, key in POLLUTANT_READINGS.items()
         }
 
+        closest = _find_closest_region(
+            self._resp["data"].get("regionMetadata", []),
+            self.data,
+            self.latitude,
+            self.longitude,
+        )
+        if closest is not None:
+            self.closest_region = closest["region"]
+            self.closest_value = closest["value"]
+            self.closest_distance_km = closest["distance_km"]
+
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
@@ -462,9 +664,16 @@ class PSI(NeaData):
 class PM25(NeaData):
     """Class for _pm2.5_ data"""
 
-    def __init__(self):
+    def __init__(
+        self, latitude: float | None = None, longitude: float | None = None
+    ) -> None:
         self.timestamp = ""
         self.data = dict()
+        self.closest_region: str | None = None
+        self.closest_value: float | int | None = None
+        self.closest_distance_km: float | None = None
+        self.latitude = latitude
+        self.longitude = longitude
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["pm25"],
@@ -477,6 +686,17 @@ class PM25(NeaData):
 
         # Store pm25 data
         self.data = self._resp["data"]["items"][0]["readings"]["pm25_one_hourly"]
+
+        closest = _find_closest_region(
+            self._resp["data"].get("regionMetadata", []),
+            self.data,
+            self.latitude,
+            self.longitude,
+        )
+        if closest is not None:
+            self.closest_region = closest["region"]
+            self.closest_value = closest["value"]
+            self.closest_distance_km = closest["distance_km"]
 
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
@@ -540,12 +760,24 @@ class WindSpeed(NeaData):
 class Wind:
     """Special class for combining _wind-speed_ & _wind-direction_ data"""
 
-    def __init__(self):
+    def __init__(
+        self, latitude: float | None = None, longitude: float | None = None
+    ) -> None:
         self.direction = WindDirection()
         self.speed = WindSpeed()
         self.wind_status: dict
         self.wind_speed_avg: float
         self.wind_dir_avg: float
+        self.island_wind_speed_avg: float = 0.0
+        self.island_wind_dir_avg: float = 0.0
+        self.station_id: str | None = None
+        self.station_name: str | None = None
+        self.station_latitude: float | None = None
+        self.station_longitude: float | None = None
+        self.station_distance_km: float | None = None
+        self.google_maps_url: str | None = None
+        self.latitude = latitude
+        self.longitude = longitude
         self.response: dict
 
     async def async_init(self, session: aiohttp.ClientSession) -> None:
@@ -560,8 +792,36 @@ class Wind:
             self.speed.data,
             self.direction.data,
         )
-        self.wind_speed_avg = self.wind_status["agg_wind_speed"]
-        self.wind_dir_avg = self.wind_status["agg_wind_direction"]
+        self.island_wind_speed_avg = self.wind_status["agg_wind_speed"]
+        self.island_wind_dir_avg = self.wind_status["agg_wind_direction"]
+        self.wind_speed_avg = self.island_wind_speed_avg
+        self.wind_dir_avg = self.island_wind_dir_avg
+
+        if is_valid_coordinates(self.latitude, self.longitude) and isinstance(
+            self.speed._resp, dict
+        ):
+            stations = self.speed._resp.get("data", {}).get("stations", [])
+            dir_map = {
+                r.get("stationId"): r.get("value")
+                for r in self.direction.data
+                if r.get("stationId") and isinstance(r.get("value"), (int, float))
+            }
+            paired_speed_readings = [
+                r for r in self.speed.data if r.get("stationId") in dir_map
+            ]
+            closest = _find_closest_station_reading(
+                stations, paired_speed_readings, self.latitude, self.longitude
+            )
+            if closest is not None:
+                sid = closest["station_id"]
+                self.wind_speed_avg = closest["value"]
+                self.wind_dir_avg = float(dir_map[sid]) % 360
+                self.station_id = sid
+                self.station_name = closest["station_name"]
+                self.station_latitude = closest["latitude"]
+                self.station_longitude = closest["longitude"]
+                self.station_distance_km = closest["distance_km"]
+                self.google_maps_url = closest["google_maps_url"]
 
     def calc_wind_status(self, wind_speed, wind_direction):
         """Function to aggregate wind readings into a single aggregated value"""
@@ -606,16 +866,41 @@ class Wind:
 class Rain(NeaData):
     """Class for _rainfall_ data"""
 
-    def __init__(self):
+    def __init__(
+        self, latitude: float | None = None, longitude: float | None = None
+    ) -> None:
         self.timestamp = ""
         self.data = list()
         self.metadata = list()
         self.station_list = list()
+        self.closest_station_id: str | None = None
+        self.latitude = latitude
+        self.longitude = longitude
         NeaData.__init__(
             self,
             PRIMARY_ENDPOINTS["rainfall"],
             SECONDARY_ENDPOINTS["rainfall"],
         )
+
+    def _resolve_closest_station(self) -> None:
+        if not is_valid_coordinates(self.latitude, self.longitude) or not self.station_list:
+            return
+        candidates = []
+        for station in self.station_list:
+            sid = station.get("id")
+            loc = station.get("location", {})
+            slat, slon = loc.get("latitude"), loc.get("longitude")
+            if sid and is_valid_coordinates(slat, slon):
+                candidates.append(
+                    (
+                        haversine_km(
+                            float(self.latitude), float(self.longitude), float(slat), float(slon)
+                        ),
+                        sid,
+                    )
+                )
+        if candidates:
+            self.closest_station_id = min(candidates, key=lambda x: x[0])[1]
 
     def process_data(self):
         # Update data timestamp
@@ -646,6 +931,7 @@ class Rain(NeaData):
                     "location": self.station_list[i]["location"],
                 }
 
+        self._resolve_closest_station()
         _LOGGER.debug("%s: Data processed", self.__class__.__name__)
         return
 
@@ -664,5 +950,6 @@ class Rain(NeaData):
                 "location": self.station_list[i]["location"],
             }
 
+        self._resolve_closest_station()
         _LOGGER.debug("%s: Secondary data processed", self.__class__.__name__)
         return

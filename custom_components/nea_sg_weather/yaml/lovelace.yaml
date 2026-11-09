@@ -4,6 +4,70 @@
 
   type: vertical-stack
   cards:
+    - type: weather-forecast
+      entity: weather.singapore_weather
+      name: NEA Forecast (Pan-Singapore)
+      show_current: true
+      show_forecast: true
+      forecast_type: daily
+    - type: entities
+      title: Local Weather
+      entities:
+        - entity: sensor.singapore_weather_closest
+          name: Closest Weather Station
+        - type: attribute
+          entity: sensor.singapore_weather_closest
+          attribute: forecast
+          name: 2-Hr Local Forecast
+          icon: mdi:weather-partly-rainy
+        - type: attribute
+          entity: sensor.singapore_weather_closest
+          attribute: temperature
+          name: Temperature
+          suffix: °C
+          icon: mdi:thermometer
+        - type: attribute
+          entity: sensor.singapore_weather_closest
+          attribute: humidity
+          name: Humidity
+          suffix: "%"
+          icon: mdi:water-percent
+        - type: attribute
+          entity: sensor.singapore_weather_closest
+          attribute: wind_speed_kmh
+          name: Wind Speed
+          suffix: km/h
+          icon: mdi:weather-windy
+        - type: attribute
+          entity: sensor.singapore_weather_closest_psi
+          attribute: PM2.5 (1h)
+          name: PM2.5 (1-Hr, Closest Region)
+          suffix: μg/m³
+          icon: mdi:blur
+        - entity: sensor.singapore_weather_closest_psi
+          name: PSI (24-Hr, Closest Region)
+        - entity: sensor.singapore_weather_uv
+          name: UV Index
+    - type: markdown
+      content: >-
+        {% set c = 'sensor.singapore_weather_closest' %}
+        {% set p = 'sensor.singapore_weather_closest_psi' %}
+        {% set lat = state_attr(c, 'latitude') %}
+        {% set lon = state_attr(c, 'longitude') %}
+        {% set station = states(c) %}
+        {% set dist = state_attr(c, 'distance_km') %}
+        {% set area = state_attr(c, 'forecast_area') %}
+        {% set cond = state_attr(c, 'forecast') %}
+        {% set temp = state_attr(c, 'temperature') %}
+        {% set hum = state_attr(c, 'humidity') %}
+        {% set wind = state_attr(c, 'wind_speed_kmh') %}
+        {% set brg = state_attr(c, 'wind_bearing') %}
+        {% set psi = states(p) %}
+        {% set pm25 = state_attr(p, 'PM2.5 (1h)') %}
+        {% set reg = state_attr(p, 'region') %}
+        {% set rdist = state_attr(p, 'distance_km') %}
+        📍 **Closest Station:** [{{ station }} ({{ dist }} km)](https://www.google.com/maps/search/?api=1&query={{ lat }},{{ lon }}) · **2-hr Area:** {{ area }} ({{ cond }})
+        🌡️ **{{ temp }} °C** · 💧 **{{ hum }}% RH** · 💨 **{{ wind }} km/h ({{ brg }}°)** · 🌫️ **PM2.5 {{ pm25 }} μg/m³** · **PSI {{ psi }}** ({{ reg }}, {{ rdist }} km)
     - type: picture-elements
       image: 'https://www.nea.gov.sg/assets/images/map/base-853.png'
       elements:

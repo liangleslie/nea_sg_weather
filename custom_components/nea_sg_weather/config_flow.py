@@ -22,6 +22,7 @@ import homeassistant.helpers.config_validation as cv
 from .const import (
     AREAS,
     CONF_AREAS,
+    CONF_CLOSEST,
     CONF_RAIN,
     CONF_SENSOR,
     CONF_WEATHER,
@@ -107,13 +108,14 @@ class NeaWeatherFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_SENSORS][CONF_AREAS] = user_input[CONF_AREAS]
             return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
 
+        area_options = [CONF_CLOSEST, "All"] + AREAS
         return self.async_show_form(
             step_id="sensor",
             data_schema=vol.Schema(
                 {
                     vol.Optional(CONF_PREFIX, default=DEFAULT_NAME): str,
-                    vol.Optional(CONF_AREAS, default=["All"]): cv.multi_select(
-                        dict(zip(["All"] + AREAS, ["All"] + AREAS))
+                    vol.Optional(CONF_AREAS, default=[CONF_CLOSEST]): cv.multi_select(
+                        dict(zip(area_options, area_options))
                     ),
                     vol.Optional(CONF_REGION, default=False): cv.boolean,
                     vol.Optional(CONF_RAIN, default=False): cv.boolean,
@@ -158,9 +160,9 @@ class NeaWeatherFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 )
             self._errors["base"] = "no_entities_selected"
 
-        area_options = ["All"] + AREAS
+        area_options = [CONF_CLOSEST, "All"] + AREAS
         current_areas = [
-            area for area in sensors.get(CONF_AREAS, ["All"]) if area in area_options
+            area for area in sensors.get(CONF_AREAS, [CONF_CLOSEST]) if area in area_options
         ]
         return self.async_show_form(
             step_id="reconfigure",

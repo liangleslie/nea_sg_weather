@@ -35,6 +35,7 @@ from .nea import (
 
 from .const import (
     CONF_AREAS,
+    CONF_CLOSEST,
     CONF_RAIN,
     CONF_SENSOR,
     CONF_WEATHER,
@@ -199,7 +200,9 @@ class NeaWeatherData:
     async def async_update(self) -> NeaData:
         """Get the latest data from NEA API for entities registered."""
         # Consolidate data requests to avoid redundant requests
-        self.data = self.NeaData()
+        lat = getattr(getattr(self._hass, "config", None), "latitude", None)
+        lon = getattr(getattr(self._hass, "config", None), "longitude", None)
+        self.data = self.NeaData(lat, lon)
         _data_objects = list()
         if self._config_entry.data[CONF_WEATHER]:
             _data_objects += [
@@ -217,8 +220,17 @@ class NeaWeatherData:
         else:
             _sensors = self._config_entry.data[CONF_SENSORS]
             _platforms = get_platforms(self._config_entry)["platforms"]
-            if _sensors.get(CONF_AREAS, ["None"]) not in (["None"], []):
+            _areas = _sensors.get(CONF_AREAS, ["None"])
+            if _areas not in (["None"], []):
                 _data_objects += [self.data.forecast2hr]
+                if CONF_CLOSEST in _areas:
+                    _data_objects += [
+                        self.data.temperature,
+                        self.data.humidity,
+                        self.data.wind,
+                        self.data.pm25,
+                        self.data.psi,
+                    ]
             if _sensors.get(CONF_REGION, False):
                 _data_objects += [
                     self.data.forecast24hr,
@@ -265,15 +277,17 @@ class NeaWeatherData:
     class NeaData:
         """Container for Weather data"""
 
-        def __init__(self) -> None:
-            self.forecast2hr = Forecast2hr()
+        def __init__(
+            self, latitude: float | None = None, longitude: float | None = None
+        ) -> None:
+            self.forecast2hr = Forecast2hr(latitude, longitude)
             self.forecast24hr = Forecast24hr()
             self.forecast4day = Forecast4day()
-            self.temperature = Temperature()
-            self.humidity = Humidity()
+            self.temperature = Temperature(latitude, longitude)
+            self.humidity = Humidity(latitude, longitude)
             self.uvindex = UVIndex()
-            self.wind = Wind()
-            self.rain = Rain()
-            self.pm25 = PM25()
-            self.psi = PSI()
+            self.wind = Wind(latitude, longitude)
+            self.rain = Rain(latitude, longitude)
+            self.pm25 = PM25(latitude, longitude)
+            self.psi = PSI(latitude, longitude)
             self.query_time = datetime.now(timezone(timedelta(hours=8))).isoformat()

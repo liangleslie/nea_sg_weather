@@ -123,7 +123,25 @@ class NeaWeather(CoordinatorEntity, WeatherEntity):
     @property
     def extra_state_attributes(self) -> dict:
         """Return dict of additional properties to attach to sensors."""
-        return {"Updated at": self.coordinator.data.temperature.timestamp}
+        attrs: dict[str, Any] = {"Updated at": self.coordinator.data.temperature.timestamp}
+        f2h = getattr(self.coordinator.data, "forecast2hr", None)
+        temp = getattr(self.coordinator.data, "temperature", None)
+        hum = getattr(self.coordinator.data, "humidity", None)
+        wind = getattr(self.coordinator.data, "wind", None)
+        if getattr(f2h, "closest_area", None):
+            attrs["Forecast area"] = f2h.closest_area
+        if getattr(temp, "station_name", None):
+            attrs["Temperature station"] = temp.station_name
+            attrs["station_id"] = temp.station_id
+            attrs["distance_km"] = temp.station_distance_km
+            attrs["latitude"] = temp.station_latitude
+            attrs["longitude"] = temp.station_longitude
+            attrs["google_maps_url"] = temp.google_maps_url
+        if getattr(hum, "station_name", None):
+            attrs["Humidity station"] = hum.station_name
+        if getattr(wind, "station_name", None):
+            attrs["Wind station"] = wind.station_name
+        return attrs
 
     async def async_forecast_daily(self) -> list[Forecast] | None:
         """Return the daily forecast in native units.
